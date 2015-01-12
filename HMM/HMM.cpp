@@ -297,13 +297,13 @@ cl_float HMM::calcBaumWelñh(cl_int n)
 		// êåðíåë 3.1.1
 		cl::Kernel * kernel = kernels["k_3_1_1"];
 		kernel->setArg(0,*gam_sum_b); 
-		err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange,cl::NDRange(N));
+		err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N), cl::NullRange);
 		checkErr(err, "k_3_1_1");
 
 		// êåðíåë 3.1.2
 		kernel = kernels["k_3_1_2"];
 		kernel->setArg(0,M); kernel->setArg(1,*gamd_sum_b);
-		err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange,cl::NDRange(N,M));
+		err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N, M), cl::NullRange);
 		checkErr(err, "k_3_1_2");
 		
 		
@@ -327,12 +327,12 @@ cl_float HMM::calcBaumWelñh(cl_int n)
 				// êåðíåë 3.2.1
 				kernel1->setArg(0,t); 
 				kernel1->setArg(1,k);
-				err = queue->enqueueNDRangeKernel(*kernel1, cl::NullRange, cl::NDRange(N));
+				err = queue->enqueueNDRangeKernel(*kernel1, cl::NullRange, cl::NDRange(N), cl::NullRange);
 				checkErr(err, "k_3_2_1");
 				// êåðíåë 3.2.2
 				kernel2->setArg(0,t); 
 				kernel2->setArg(1,k);
-				err = queue->enqueueNDRangeKernel(*kernel2, cl::NullRange, cl::NDRange(N,M));
+				err = queue->enqueueNDRangeKernel(*kernel2, cl::NullRange, cl::NDRange(N, M), cl::NullRange);
 				checkErr(err, "k_3_2_2");
 				// LOAD F from GPU here
 				//err = queue->enqueueReadBuffer(*flag_b, CL_TRUE, 0, 1*sizeof(cl_int), &flag);	
@@ -346,7 +346,7 @@ cl_float HMM::calcBaumWelñh(cl_int n)
 		// êåðíåë 3.3
 		kernel = kernels["k_3_3"];
 		kernel->setArg(0,N); kernel->setArg(1,K); kernel->setArg(2,*PI_b); kernel->setArg(3,*gam_b);
-		err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N));
+		err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N), cl::NullRange);
 		checkErr(err, "k_3_3");
 		
 		// êåðíåë 3.4
@@ -354,14 +354,14 @@ cl_float HMM::calcBaumWelñh(cl_int n)
 		kernel->setArg(0,K); kernel->setArg(1,N); kernel->setArg(2,T1);
 		kernel->setArg(3,*A_b); kernel->setArg(4,*ksi_b);
 		kernel->setArg(5,*gam_sum_b); kernel->setArg(6,*c_b);
-		err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N,N));
+		err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N, N), cl::NullRange);
 		checkErr(err, "k_3_4");
 
 		// êåðíåë 3.5
 		kernel = kernels["k_3_5"];
 		kernel->setArg(0,M); kernel->setArg(1,*TAU_b); kernel->setArg(2,*gamd_sum_b);
 		kernel->setArg(3,*gam_sum_b);
-		err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N,M));
+		err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N, M), cl::NullRange);
 		checkErr(err, "k_3_5");
 		
 		// êåðíåë 3.6
@@ -370,7 +370,7 @@ cl_float HMM::calcBaumWelñh(cl_int n)
 		kernel->setArg(3,Z); kernel->setArg(4,T); 
 		kernel->setArg(5,*MU_b); kernel->setArg(6,*gamd_b); 
 		kernel->setArg(7,*Otr_b); kernel->setArg(8,*gamd_sum_b);
-		err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N,Z,M));
+		err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N, Z, M), cl::NullRange);
 		checkErr(err, "k_3_6");
 
 		// êåðíåë 3.7
@@ -380,29 +380,29 @@ cl_float HMM::calcBaumWelñh(cl_int n)
 		kernel->setArg(5,*SIG_b); kernel->setArg(6,*gamd_b); 
 		kernel->setArg(7,*gamd_sum_b); 
 		kernel->setArg(8,*MU_b); kernel->setArg(9,*Otr_b);
-		err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N,Z*Z,M));
+		err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N, Z*Z, M), cl::NullRange);
 		checkErr(err, "k_3_7");
 		
 		// êåðíåë 3.8
 		kernel = kernels["k_3_8"];
 		kernel->setArg(0,*PI1_b); kernel->setArg(1,*PI_b);
-		err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N));
+		err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N), cl::NullRange);
 		checkErr(err, "k_3_8");
 		// êåðíåë 3.9
 		kernel = kernels["k_3_9"];
 		kernel->setArg(0,N); kernel->setArg(1,*A1_b); kernel->setArg(2,*A_b);
-		err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N,N));
+		err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N, N), cl::NullRange);
 		checkErr(err, "k_3_9");
 		// êåðíåë 3.10
 		kernel = kernels["k_3_10"];
 		kernel->setArg(0,M); kernel->setArg(1,*TAU1_b); kernel->setArg(2,*TAU_b);
-		err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N,M));
+		err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N, M), cl::NullRange);
 		checkErr(err, "k_3_10");
 		// êåðíåë 3.11
 		kernel = kernels["k_3_11"];
 		kernel->setArg(0,N); kernel->setArg(1,M); kernel->setArg(2,Z);
 		kernel->setArg(3,n); kernel->setArg(4,*MU1_b); kernel->setArg(5,*MU_b);
-		err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N,M,Z));
+		err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N, M, Z), cl::NullRange);
 		checkErr(err, "k_3_11");
 		// êåðíåë 3.12
 		kernel = kernels["k_3_12"];
@@ -452,7 +452,8 @@ void HMM::internal_calculations(cl_int n)
 	err = queue->enqueueNDRangeKernel(
 		*kernel, 
 		cl::NullRange,
-		cl::NDRange(T,K,N*M));
+		cl::NDRange(T, K, N*M),
+		cl::NullRange);
 	checkErr(err, "calc_g");
 
 	// êåðíåë calcB
@@ -466,7 +467,8 @@ void HMM::internal_calculations(cl_int n)
 	err = queue->enqueueNDRangeKernel(
 		*kernel, 
 		cl::NullRange,
-		cl::NDRange(N,T,K));
+		cl::NDRange(N,T,K),
+		cl::NullRange);
 	checkErr(err, "calcB");
 
 	// DEBUG - EVERYTHING IS OK!
@@ -489,7 +491,8 @@ void HMM::internal_calculations(cl_int n)
 	err = queue->enqueueNDRangeKernel(
 		*kernel, 
 		cl::NullRange,
-		cl::NDRange(N,T,K));
+		cl::NDRange(N,T,K),
+		cl::NullRange);
 	checkErr(err, "k_2_1");
 
 
@@ -500,7 +503,7 @@ void HMM::internal_calculations(cl_int n)
 	kernel->setArg(2,T1); kernel->setArg(3,*alf_t_b);
 	kernel->setArg(4,*PI_used_b); kernel->setArg(5,*B_b);
 	kernel->setArg(6,*bet_b);
-	err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N,K));
+	err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N, K), cl::NullRange);
 	checkErr(err, "k_2_2");
 
 	// êåðíåë 2.3 (áîëüøîé)
@@ -516,11 +519,11 @@ void HMM::internal_calculations(cl_int n)
 	{
 		// êåðíåë 2.3.1
 		kernel1->setArg(2,t);
-		err = queue->enqueueNDRangeKernel(*kernel1, cl::NullRange, cl::NDRange(N,K));
+		err = queue->enqueueNDRangeKernel(*kernel1, cl::NullRange, cl::NDRange(N, K), cl::NullRange);
 		checkErr(err, "k_2_3_1");
 		// êåðíåë 2.3.2
 		kernel2->setArg(3,t);
-		err = queue->enqueueNDRangeKernel(*kernel2, cl::NullRange, cl::NDRange(N,K));
+		err = queue->enqueueNDRangeKernel(*kernel2, cl::NullRange, cl::NDRange(N, K), cl::NullRange);
 		checkErr(err, "k_2_3_2");
 	}
 
@@ -546,7 +549,7 @@ void HMM::internal_calculations(cl_int n)
 	kernel->setArg(0,N); kernel->setArg(1,K);
 	kernel->setArg(2,*c_b); kernel->setArg(3,*alf_b);
 	kernel->setArg(4,*alf_t_b);
-	err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(T1,K));
+	err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(T1, K), cl::NullRange);
 	checkErr(err, "k_2_3_3");
 
 	
@@ -557,7 +560,7 @@ void HMM::internal_calculations(cl_int n)
 	kernel->setArg(0,N); kernel->setArg(1,K);
 	kernel->setArg(2,T1); kernel->setArg(3,*alf_b);
 	kernel->setArg(4,*alf_t_b); kernel->setArg(5,*c_b);
-	err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N,K));
+	err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N, K), cl::NullRange);
 	checkErr(err, "k_2_4");
 	
 
@@ -575,11 +578,11 @@ void HMM::internal_calculations(cl_int n)
 	{
 		// êåðíåë 2.5.1
 		kernel1->setArg(0,t);
-		err = queue->enqueueNDRangeKernel(*kernel1, cl::NullRange, cl::NDRange(N,K));
+		err = queue->enqueueNDRangeKernel(*kernel1, cl::NullRange, cl::NDRange(N, K), cl::NullRange);
 		checkErr(err, "k_2_5_1");
 		// êåðíåë 2.5.2
 		kernel2->setArg(0,t);	
-		err = queue->enqueueNDRangeKernel(*kernel2, cl::NullRange, cl::NDRange(N,K));
+		err = queue->enqueueNDRangeKernel(*kernel2, cl::NullRange, cl::NDRange(N, K), cl::NullRange);
 		checkErr(err, "k_2_5_2");
 	}
 
@@ -594,7 +597,7 @@ void HMM::internal_calculations(cl_int n)
 	kernel->setArg(10,*SIG_used_b); kernel->setArg(11,*Otr_b);
 	kernel->setArg(12,*MU_used_b); kernel->setArg(13,*gamd_b);
 	kernel->setArg(14,*g_b);
-	err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N,T,K));
+	err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N, T, K), cl::NullRange);
 	checkErr(err, "k_2_6");
 
 	// êåðíåë 2.7 (set_var)
@@ -603,7 +606,7 @@ void HMM::internal_calculations(cl_int n)
 	kernel->setArg(2,T); kernel->setArg(3,*ksi_b);
 	kernel->setArg(4,*alf_b); kernel->setArg(5,*A_used_b);
 	kernel->setArg(6,*B_b); kernel->setArg(7,*bet_b);
-	err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N*N,T1,K));
+	err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N*N, T1, K), cl::NullRange);
 	checkErr(err, "k_2_7");
 }
 
