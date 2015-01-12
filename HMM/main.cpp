@@ -1,5 +1,5 @@
 #include <utility>
-#define __NO_STD_VECTOR // Use cl::vector instead of STL version
+#define __NO_STD_VECTOR		// Use cl::vector instead of STL version
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -7,20 +7,12 @@
 #include <string>
 #include <iterator>
 #include "HMM.h"
-#include <windows.h>                // for Windows APIs
+#include <windows.h>
 
-// проверка ошибки OpenCL
-/*void checkErr(cl_int err, const char * name)
-{
-	if (err != CL_SUCCESS) {
-		std::cerr << "ERROR: " << name
-		<< " (" << err << ")" << std::endl;
-		exit(EXIT_FAILURE);
-	}
-}*/
+
 
 // подсчет процента верно распознанных последовательностей
-void classClassify(cl_float * p1, cl_float * p2, cl_float &percent1, cl_float &percent2, int K)
+void classClassify(real_t * p1, real_t * p2, real_t &percent1, real_t &percent2, int K)
 {
 	percent1=percent2=0;
 	for(int k=0;k<K;k++)
@@ -35,17 +27,19 @@ void classClassify(cl_float * p1, cl_float * p2, cl_float &percent1, cl_float &p
 
 
 // инциализируем OpenCL
-bool initializeOpenCL(cl::Context *& context, std::map<std::string,cl::Kernel*> & kernels, cl::CommandQueue *& queue)
+bool initializeOpenCL(cl::Context *& context, std::map<std::string, cl::Kernel*> & kernels, cl::CommandQueue *& queue)
 {
 	// инициализаци€ платформы
 	cl_int err;										// переменна€ с кодом ошибки
 	cl::vector< cl::Platform > platformList;		// список платформ			
 	cl::Platform::get(&platformList);				//получим список доступных платформ
-	checkErr(platformList.size()!=0 ? CL_SUCCESS : -1, "cl::Platform::get");
+	checkErr(platformList.size() != 0 ? CL_SUCCESS : -1, "cl::Platform::get");
+	std::cout << "Number of platforms: " << platformList.size() << std::endl;
+
 
 	// создание контекста
-	cl_context_properties cprops[3] = 
-		{CL_CONTEXT_PLATFORM, (cl_context_properties)(platformList[0])(), 0};		// зададим свойства дл€ первой платформы
+	cl_context_properties cprops[3] =
+	{ CL_CONTEXT_PLATFORM, (cl_context_properties)(platformList[0])(), 0 };		// зададим свойства дл€ первой платформы
 	context = new cl::Context(CL_DEVICE_TYPE_GPU, cprops, NULL, NULL, &err);		// создадим контекст устройства с заданными свойствами
 	checkErr(err, "Context::Context()");
 
@@ -53,19 +47,31 @@ bool initializeOpenCL(cl::Context *& context, std::map<std::string,cl::Kernel*> 
 	cl::vector<cl::Device> devices = context->getInfo<CL_CONTEXT_DEVICES>();			// получение списка устройств дл€ контеста
 	checkErr(devices.size() > 0 ? CL_SUCCESS : -1, "devices.size() > 0");
 
+	std::string deviceName;
+	devices[0].getInfo(CL_DEVICE_NAME, &deviceName);
+	std::cout << "Number of devices: " << devices.size() << std::endl;
+	std::cout << "Current device: " << deviceName << std::endl;
+
 	// загрузка исходного кода кернела и компил€ци€
-	std::ifstream file("kernels.cl");															// загрузка исходного кода кернела
-	checkErr(file.is_open() ? CL_SUCCESS:-1, "kernels.cl");
-	std::string prog1(std::istreambuf_iterator<char>(file),(std::istreambuf_iterator<char>()));		// запись кода в строку
+	std::ifstream file("kernels.cl");																// загрузка исходного кода кернела
+	checkErr(file.is_open() ? CL_SUCCESS : -1, "kernels.cl");
+	std::string prog1(std::istreambuf_iterator<char>(file), (std::istreambuf_iterator<char>()));		// запись кода в строку
 	file.close();
 	cl::Program::Sources sources; //sources(1, std::make_pair(prog1.c_str(), prog1.length()+1));;
-	sources.push_back(std::make_pair(prog1.c_str(), prog1.length()+1));				// переменна€ - пара: исходный код + длина кода
-	cl::Program program(*context, sources);						// переменна€-программа дл€ данного контекста
-	err = program.build(devices,"");							// построение исходного кода дл€ всех устройств
+	sources.push_back(std::make_pair(prog1.c_str(), prog1.length() + 1));				// переменна€ - пара: исходный код + длина кода
+	cl::Program program(*context, sources);											// переменна€-программа дл€ данного контекста
+	#if defined(CONFIG_USE_DOUBLE)
+		std::cout << "Using double precision" << std::endl;
+		err = program.build(devices, "-D CONFIG_USE_DOUBLE");						// построение исходного кода дл€ всех устройств »—ѕќЋ№«ќ¬ј“№ ƒ¬ќ…Ќ”ё “ќ„Ќќ—“№!
+	#else
+	std::cout << "Using single precision" << std::endl;
+		err = program.build(devices, "");
+	#endif
+	
 	// выведем ошибки компил€ции, если таковые присутствуют
 	std::string buildLog;
-	program.getBuildInfo(devices[0],CL_PROGRAM_BUILD_LOG,&buildLog);
-	std::cerr << "build log:\n" << buildLog << std::endl;
+	program.getBuildInfo(devices[0], CL_PROGRAM_BUILD_LOG, &buildLog);
+	std::cerr << "\nbuild log:\n" << buildLog << std::endl;
 	std::fstream f;
 	f.open("compiler.txt",std::fstream::out);
 	f<<buildLog;
@@ -124,10 +130,10 @@ int main(void)
 	//
 	//  Ћј——»‘» ј÷»я
 	int K = M1.K;
-	cl_float * p1_1 = new cl_float[K]; for(int i=0; i<K; i++) p1_1[i]=0.;
-	cl_float * p1_2 = new cl_float[K]; for(int i=0; i<K; i++) p1_2[i]=0.;
-	cl_float * p2_1 = new cl_float[K]; for(int i=0; i<K; i++) p2_1[i]=0.;
-	cl_float * p2_2 = new cl_float[K]; for(int i=0; i<K; i++) p2_2[i]=0.;
+	real_t * p1_1 = new real_t[K]; for(int i=0; i<K; i++) p1_1[i]=0.;
+	real_t * p1_2 = new real_t[K]; for(int i=0; i<K; i++) p1_2[i]=0.;
+	real_t * p2_1 = new real_t[K]; for(int i=0; i<K; i++) p2_1[i]=0.;
+	real_t * p2_2 = new real_t[K]; for(int i=0; i<K; i++) p2_2[i]=0.;
 	M1.getTestObserv("model1\\Otest1.txt");		// считаем 1 тест в 1 модель
 	M2.getTestObserv("model1\\Otest1.txt");		// считаем 1 тест в 2 модель
 	QueryPerformanceCounter(&t1);				// start timer
@@ -155,7 +161,7 @@ int main(void)
 		cout << p2_1[i] << "\t" << p2_2[i] << endl;*/
 
 	/// подсчет процента верно распознанных и запись его в файл
-	cl_float succ1,fail1,succ2,fail2;
+	real_t succ1,fail1,succ2,fail2;
 	classClassify(p1_1,p1_2,succ1,fail1,K);
 	classClassify(p2_1,p2_2,fail2,succ2,K);
 	std::fstream f;

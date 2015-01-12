@@ -5,6 +5,13 @@
 #include <iostream>
 #include <map>
 
+//#define CONFIG_USE_DOUBLE             // использовать ли двойную точность
+
+#if defined(CONFIG_USE_DOUBLE)
+typedef cl_double real_t;
+#else
+typedef cl_float real_t;
+#endif
 
 #define A(i,j) A[i*N+j]
 #define A1(i,j) A1[i*N+j]
@@ -39,9 +46,9 @@ public:
 	// параметры модели
 	cl_int N,M,K,T,NumInit;
 	cl_int Z;	// размерность наблюдений
-	cl_float *PI,*A,*TAU,*MU,*SIG,*MU1,*SIG1,*Otr,*A1,*PI1,*TAU1;
+	real_t *PI,*A,*TAU,*MU,*SIG,*MU1,*SIG1,*Otr,*A1,*PI1,*TAU1;
 	cl::Buffer *PI_b,*A_b,*TAU_b,*MU_b,*SIG_b,*MU1_b,*SIG1_b,*Otr_b,*A1_b,*PI1_b,*TAU1_b;
-	cl_float *alf,*bet,*c,*ksi,*gam,*gamd,*alf_t,*bet_t,*B;
+	real_t *alf,*bet,*c,*ksi,*gam,*gamd,*alf_t,*bet_t,*B;
 	cl::Buffer *alf_b,*bet_b,*c_b,*ksi_b,*gam_b,*gamd_b,*alf_t_b,*bet_t_b,*B_b;
 	cl::Buffer * gam_sum_b, * gamd_sum_b;
 	cl::Buffer * flag_b;
@@ -55,19 +62,19 @@ public:
 	~HMM(void);
 	void findModelParameters();					// нахождение параметров модели
 	void getTestObserv(std::string filename);	// считывание тестовых последовательностей для классификации
-	void classifyObservations(cl_float * p);	// классификация последовательностей наблюдений 
+	void classifyObservations(real_t * p);	// классификация последовательностей наблюдений 
 												// (p[k] - вероятностей того, что 
 												// данная модель породила последовательность под номером k)
 	void bindOpenCL(cl::Context * context_, std::map<std::string,cl::Kernel*> & kernels, cl::CommandQueue * queue_); // привязка OpenCL переменных и создание буферов
 private:
 	// нахождение параметров алгоритомом Баума-Велша
-	cl_float calcBaumWelсh(cl_int n);
+	real_t calcBaumWelсh(cl_int n);
 	// вспомогательная функция, для расчетов в обучении и классификации
 	void internal_calculations(cl_int n);
 	// вспомогательная функция для расчетов
-	//cl_float g(int t,int k,int i,int m,int n);
+	//real_t g(int t,int k,int i,int m,int n);
 	// нахождение вероятности генерации моделью наблюдений
-	cl_float calcProbability();
+	real_t calcProbability();
 	// проверка ошибок (вспом)
 	//static void checkErr(cl_int err, const char * name);
 };

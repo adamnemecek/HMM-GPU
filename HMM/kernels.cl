@@ -1,4 +1,35 @@
 //#pragma OPENCL EXTENSION cl_khr_byte_addressable_store : enable
+//#pragma OPENCL EXTENSION cl_khr_fp64 : enable
+
+#if CONFIG_USE_DOUBLE
+	#if defined(cl_khr_fp64)  // Khronos extension available?
+		#pragma OPENCL EXTENSION cl_khr_fp64 : enable
+		#define DOUBLE_SUPPORT_AVAILABLE
+	#elif defined(cl_amd_fp64)  // AMD extension available?
+		#pragma OPENCL EXTENSION cl_amd_fp64 : enable
+		#define DOUBLE_SUPPORT_AVAILABLE
+	#endif
+#endif // CONFIG_USE_DOUBLE
+
+#if defined(DOUBLE_SUPPORT_AVAILABLE)
+	// double
+	typedef double real_t;
+	typedef double2 real2_t;
+	typedef double3 real3_t;
+	typedef double4 real4_t;
+	typedef double8 real8_t;
+	typedef double16 real16_t;
+	#define pi 3.14159265358979323846
+#else
+	// float
+	typedef float real_t;
+	typedef float2 real2_t;
+	typedef float3 real3_t;
+	typedef float4 real4_t;
+	typedef float8 real8_t;
+	typedef float16 real16_t;
+	#define pi 3.14159265359f
+#endif
 
 #define A(i,j) A[i*N+j]
 #define A1(i,j) A1[i*N+j]
@@ -24,17 +55,17 @@
 
 #define g(t,k,i,m,n) g[((((n)*N+i)*M+m)*K+k)*T+t]
 
-#define pi 3.1415926535897932384626433832795f
+//#define pi 3.1415926535897932384626433832795f
 
 
 // œ–Œ“¿¡”À»–Œ¬¿“‹ g «¿–¿Õ≈≈!!!
 __kernel void calc_g(
 		int n,
 		int N, int M, int Z, int T, int K,
-		__global float *SIG1,
-		__global float *Otr,
-		__global float *MU1,
-		__global float * g)
+		__global real_t *SIG1,
+		__global real_t *Otr,
+		__global real_t *MU1,
+		__global real_t * g)
 {
 	size_t t = get_global_id(0);
 	size_t k = get_global_id(1);
@@ -47,8 +78,8 @@ __kernel void calc_g(
 	}
 
 	int z;
-	float det=1.0f,res=0.0f;
-	//float tmp1,tmp2;
+	real_t det=1.0f,res=0.0f;
+	//real_t tmp1,tmp2;
 	if (n==-1)
 		n=0;
 	for (z=0;z<Z;z++)
@@ -73,10 +104,10 @@ __kernel void calc_g(
 
 __kernel void calcB(int n, 
 					int N, int M, int Z, int T, int K, 
-					__global float * TAU, 
-					__global float * B, __global float *SIG,
-					__global float *Otr, __global float *MU,
-					__global float *g
+					__global real_t * TAU, 
+					__global real_t * B, __global real_t *SIG,
+					__global real_t *Otr, __global real_t *MU,
+					__global real_t *g
 					)
 {
 	int m;
@@ -92,9 +123,9 @@ __kernel void calcB(int n,
 
 __kernel void k_2_1(
 					int N, int K,
-					__global float * c, 
-					__global float * alf, __global float * bet,
-					__global float * alf_t, __global float * bet_t
+					__global real_t * c, 
+					__global real_t * alf, __global real_t * bet,
+					__global real_t * alf_t, __global real_t * bet_t
 					)
 {
 	size_t i = get_global_id(0);
@@ -107,8 +138,8 @@ __kernel void k_2_1(
 }
 
 __kernel void k_2_2(int N, int K, int T1,
-					__global float * alf_t, __global float * PI,
-					__global float * B, __global float * bet
+					__global real_t * alf_t, __global real_t * PI,
+					__global real_t * B, __global real_t * bet
 					)
 {	int T = T1+1;
 	size_t i = get_global_id(0);
@@ -118,14 +149,14 @@ __kernel void k_2_2(int N, int K, int T1,
 }
 
 __kernel void k_2_3_1(int N, int K, int t,
-					__global float * alf, 
-					__global float * alf_t
+					__global real_t * alf, 
+					__global real_t * alf_t
 					)
 {
 	int j;
 	size_t i = get_global_id(0);
 	size_t k = get_global_id(1);
-	float atsum=0.0f;
+	real_t atsum=0.0f;
 	for(j=0; j<N; j++)
 		atsum += alf_t(t,j,k);
 	alf(t,i,k)=alf_t(t,i,k)/atsum;
@@ -136,25 +167,25 @@ __kernel void k_2_3_1(int N, int K, int t,
 }
 
 __kernel void k_2_3_2(int N, int K, int T, int t,
-					__global float * alf, 
-					__global float * alf_t,
-					__global float * A,
-					__global float * B
+					__global real_t * alf, 
+					__global real_t * alf_t,
+					__global real_t * A,
+					__global real_t * B
 					)
 {
 	int j;
 	size_t i = get_global_id(0);
 	size_t k = get_global_id(1);
-	float atsum = 0.0f;
+	real_t atsum = 0.0f;
 	for(j=0; j<N; j++)
 		atsum += alf(t,j,k)*A(j,i);
 	alf_t(t+1,i,k) = B(i,t+1,k)*atsum;
 }
 
 __kernel void k_2_3_3(int N, int K,
-					__global float * c,
-					__global float * alf, 
-					__global float * alf_t
+					__global real_t * c,
+					__global real_t * alf, 
+					__global real_t * alf_t
 					)
 {
 	int i;
@@ -171,15 +202,15 @@ __kernel void k_2_3_3(int N, int K,
 }
 
 __kernel void k_2_4(int N, int K, int T1,
-					__global float * alf,
-					__global float * alf_t,
-					__global float * c
+					__global real_t * alf,
+					__global real_t * alf_t,
+					__global real_t * c
 					)
 {
 	int j;
 	size_t i = get_global_id(0);
 	size_t k = get_global_id(1);
-	float atsum = 0.0f;
+	real_t atsum = 0.0f;
 	for(j=0; j<N; j++)
 		atsum += alf_t(T1,j,k);
 	alf(T1,i,k) = alf_t(T1,i,k)/atsum;
@@ -196,9 +227,9 @@ __kernel void k_2_4(int N, int K, int T1,
 
 
 __kernel void k_2_5_1( int t, int N, int K,
-					  __global float * bet_t, 
-					  __global float * c,
-					  __global float * bet  
+					  __global real_t * bet_t, 
+					  __global real_t * c,
+					  __global real_t * bet  
 					 )
 {
 	size_t i = get_global_id(0);
@@ -208,11 +239,11 @@ __kernel void k_2_5_1( int t, int N, int K,
 
 
 __kernel void k_2_5_2(int t, int N, int K, int T,
-					  __global float * bet,
-					  __global float * A,
-					  __global float * B,
-					  __global float * bet_t, 
-					  __global float * alf
+					  __global real_t * bet,
+					  __global real_t * A,
+					  __global real_t * B,
+					  __global real_t * bet_t, 
+					  __global real_t * alf
 					 )
 {	
 	int j;
@@ -227,15 +258,15 @@ __kernel void k_2_5_2(int t, int N, int K, int T,
 
 __kernel void k_2_6(int n,
 					int N, int M, int K, int Z, int T, 
-					__global float * gam,
-					__global float * alf,
-					__global float * bet,
-					__global float * TAU,
-					__global float * SIG,
-					__global float * Otr,
-					__global float * MU,
-					__global float * gamd,
-					__global float *g
+					__global real_t * gam,
+					__global real_t * alf,
+					__global real_t * bet,
+					__global real_t * TAU,
+					__global real_t * SIG,
+					__global real_t * Otr,
+					__global real_t * MU,
+					__global real_t * gamd,
+					__global real_t *g
 					)
 {
 	int m;
@@ -243,7 +274,7 @@ __kernel void k_2_6(int n,
 	size_t t = get_global_id(1);
 	size_t k = get_global_id(2);
 	gam(t,i,k) = alf(t,i,k) * bet(t,i,k);
-	float atsum = 0.0f;
+	real_t atsum = 0.0f;
 	for(m=0; m<M; m++)
 		atsum += TAU(i,m)*g(t,k,i,m,n);		//2 times g()
 	for(m=0; m<M; m++){
@@ -254,11 +285,11 @@ __kernel void k_2_6(int n,
 }
 
 __kernel void k_2_7(int N, int K, int T,
-					__global float * ksi,
-					__global float * alf,
-					__global float * A,
-					__global float * B,
-					__global float * bet
+					__global real_t * ksi,
+					__global real_t * alf,
+					__global real_t * A,
+					__global real_t * B,
+					__global real_t * bet
 					)
 {
 	int j,i;
@@ -271,13 +302,13 @@ __kernel void k_2_7(int N, int K, int T,
 }
 
 
-__kernel void k_3_1_1(__global float * gam_sum)
+__kernel void k_3_1_1(__global real_t * gam_sum)
 {
 	size_t i = get_global_id(0);
 	gam_sum[i] = 0.0f;
 }
 
-__kernel void k_3_1_2(int M, __global float * gamd_sum)
+__kernel void k_3_1_2(int M, __global real_t * gamd_sum)
 {
 	size_t i = get_global_id(0);
 	size_t m = get_global_id(1);
@@ -287,8 +318,8 @@ __kernel void k_3_1_2(int M, __global float * gamd_sum)
 __kernel void k_3_2_1(
 					int t, int k,
 					int N, int K,
-					__global float * gam_sum,
-					__global float * gam,
+					__global real_t * gam_sum,
+					__global real_t * gam,
 					__global int * flag
 					)
 {
@@ -301,22 +332,22 @@ __kernel void k_3_2_1(
 __kernel void k_3_2_2(
 					int t, int k,
 					 int N, int M, int K,
-					__global float * gam_sum,
-					__global float * gamd_sum,
-					__global float * gamd,
+					__global real_t * gam_sum,
+					__global real_t * gamd_sum,
+					__global real_t * gamd,
 					__global int * flag
 					)
 {
 	size_t i = get_global_id(0);
 	size_t m = get_global_id(1);
-	float ttt = gamd_sum[i*M+m] += gamd(t,i,m,k);
+	real_t ttt = gamd_sum[i*M+m] += gamd(t,i,m,k);
 	if(isfinite(ttt))
 		gamd_sum[i*M+m]+=gamd(t,i,m,k);
 	//if (!isfinite(gamd_sum[i*M+m]))
 	//	atomic_dec(flag);
 }
 
-__kernel void k_3_3(int N, int K, __global float * PI, __global float * gam)
+__kernel void k_3_3(int N, int K, __global real_t * PI, __global real_t * gam)
 {
 	int k;
 	size_t i = get_global_id(0);
@@ -330,14 +361,14 @@ __kernel void k_3_3(int N, int K, __global float * PI, __global float * gam)
 
 __kernel void k_3_4(
 					int K, int N, int T1,
-					__global float * A, __global float * ksi,
-					__global float * gam_sum, __global float * c
+					__global real_t * A, __global real_t * ksi,
+					__global real_t * gam_sum, __global real_t * c
 					)
 {
 	int k,t;
 	size_t i = get_global_id(0);
 	size_t j = get_global_id(1);
-	float tmp2 = 0.0f;
+	real_t tmp2 = 0.0f;
 	for(k=0; k<K; k++)
 		for(t=0; t<T1; t++)
 			tmp2 += ksi(t,i,j,k)*c(t+1,k);
@@ -345,8 +376,8 @@ __kernel void k_3_4(
 }
 
 __kernel void k_3_5(int M, 
-					__global float * TAU, __global float * gamd_sum,
-					__global float * gam_sum
+					__global real_t * TAU, __global real_t * gamd_sum,
+					__global real_t * gam_sum
 					)
 {
 	size_t i = get_global_id(0);
@@ -356,15 +387,15 @@ __kernel void k_3_5(int M,
 
 __kernel void k_3_6(
 					int N, int M, int K, int Z, int T, 
-					__global float * MU, __global float * gamd,
-					__global float * Otr, __global float * gamd_sum
+					__global real_t * MU, __global real_t * gamd,
+					__global real_t * Otr, __global real_t * gamd_sum
 					)
 {
 	int k, t;
 	size_t i = get_global_id(0);
 	size_t z = get_global_id(1);
 	size_t m = get_global_id(2);
-	float ttt;
+	real_t ttt;
 	MU(z,i,m)=0.0f;
 	for(k=0; k<K; k++)
 		for(t=0; t<T;t++)
@@ -378,15 +409,15 @@ __kernel void k_3_6(
 
 __kernel void k_3_7(
 					int N, int M, int Z, int K, int T,
-					__global float * SIG, __global float * gamd,
-					__global float * gamd_sum,
-					__global float * MU, __global float * Otr
+					__global real_t * SIG, __global real_t * gamd,
+					__global real_t * gamd_sum,
+					__global real_t * MU, __global real_t * Otr
 					)
 {
 	size_t i = get_global_id(0);
 	size_t z = get_global_id(1);
 	size_t m = get_global_id(2);
-	int k,t; float ttt, tmp3;
+	int k,t; real_t ttt, tmp3;
 	size_t z1 = z / Z, z2 = z % Z;
 	SIG(z1,z2,i,m) = 0.0f;
 	for(k=0; k<K; k++)
@@ -402,27 +433,27 @@ __kernel void k_3_7(
 	SIG(z1,z2,i,m) /= gamd_sum[i*M+m];
 }
 
-__kernel void k_3_8(__global float * PI1, __global float * PI)
+__kernel void k_3_8(__global real_t * PI1, __global real_t * PI)
 {
 	size_t i = get_global_id(0);
 	PI1[i]=PI[i];
 }
 
-__kernel void k_3_9(int N, __global float * A1, __global float * A)
+__kernel void k_3_9(int N, __global real_t * A1, __global real_t * A)
 {
 	size_t i = get_global_id(0);
 	size_t j = get_global_id(1);
 	A1(i,j)=A(i,j);
 }
 
-__kernel void k_3_10(int M,__global float * TAU1, __global float * TAU)
+__kernel void k_3_10(int M,__global real_t * TAU1, __global real_t * TAU)
 {
 	size_t i = get_global_id(0);
 	size_t m = get_global_id(1);
 	TAU1(i,m) = TAU(i,m);
 }
 
-__kernel void k_3_11(int N, int M, int Z, int n,__global float * MU1, __global float * MU)
+__kernel void k_3_11(int N, int M, int Z, int n,__global real_t * MU1, __global real_t * MU)
 {
 	size_t i = get_global_id(0);
 	size_t m = get_global_id(1);
@@ -430,7 +461,7 @@ __kernel void k_3_11(int N, int M, int Z, int n,__global float * MU1, __global f
 	MU1(z,i,m,n) = MU(z,i,m);			// TODO: optimize? numinit - only one
 }
 
-__kernel void k_3_12(int N, int M, int Z, int n, __global float * SIG1, __global float * SIG)
+__kernel void k_3_12(int N, int M, int Z, int n, __global real_t * SIG1, __global real_t * SIG)
 {
 	size_t i = get_global_id(0);
 	size_t m = get_global_id(1);

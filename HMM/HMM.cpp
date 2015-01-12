@@ -18,28 +18,28 @@ HMM::HMM(std::string filename)
 	f.close();
 
 	//ВЫДЕЛЯЕМ ПАМЯТЬ ДЛЯ ПАРАМЕТРОВ СММ
-	PI = new cl_float[N];				// начальное распределение вероятностей
-	A = new cl_float[N*N];				// вероятности переходов
-	TAU = new cl_float[N*M];			
-	MU = new cl_float[N*M*Z];
-	SIG = new cl_float[N*M*Z*Z];
-	alf = new cl_float[T*N*K];
-	bet = new cl_float[T*N*K];
-	c = new cl_float[T*K];				// коэффициенты масштаба
-	ksi = new cl_float[(T-1)*N*N*K];	
-	gam = new cl_float[T*N*K];
-	gamd = new cl_float[T*N*M*K];
-	alf_t = new cl_float[T*N*K];
-	bet_t = new cl_float[T*N*K];
-	B = new cl_float[N*T*K];			// вероятности появления наблюдений
+	PI = new real_t[N];				// начальное распределение вероятностей
+	A = new real_t[N*N];				// вероятности переходов
+	TAU = new real_t[N*M];			
+	MU = new real_t[N*M*Z];
+	SIG = new real_t[N*M*Z*Z];
+	alf = new real_t[T*N*K];
+	bet = new real_t[T*N*K];
+	c = new real_t[T*K];				// коэффициенты масштаба
+	ksi = new real_t[(T-1)*N*N*K];	
+	gam = new real_t[T*N*K];
+	gamd = new real_t[T*N*M*K];
+	alf_t = new real_t[T*N*K];
+	bet_t = new real_t[T*N*K];
+	B = new real_t[N*T*K];			// вероятности появления наблюдений
 
 	//начальные приближения
-	A1 = new cl_float[N*N];
-	TAU1 = new cl_float[N*M];
-	MU1 = new cl_float[N*M*Z*NumInit];
-	SIG1 = new cl_float[N*M*Z*Z*NumInit];
-	PI1 = new cl_float[N];
-	Otr = new cl_float[T*Z*K];
+	A1 = new real_t[N*N];
+	TAU1 = new real_t[N*M];
+	MU1 = new real_t[N*M*Z*NumInit];
+	SIG1 = new real_t[N*M*Z*Z*NumInit];
+	PI1 = new real_t[N];
+	Otr = new real_t[T*Z*K];
 
 	f.open(filename+"PI1.txt",std::fstream::in);
 	for(cl_int i=0;i<N;i++)
@@ -102,36 +102,36 @@ void HMM::bindOpenCL(cl::Context * context_, std::map<std::string,cl::Kernel*> &
 	context = context_; kernels = kernels_; queue = queue_;
 	// буферы
 	// параметры
-	PI_b = new cl::Buffer(*context,NULL,N*sizeof(cl_float));
-	A_b = new cl::Buffer(*context,NULL,N*N*sizeof(cl_float));
-	TAU_b = new cl::Buffer(*context,NULL,N*M*sizeof(cl_float));
-	MU_b = new cl::Buffer(*context,NULL,Z*N*M*sizeof(cl_float));
-	SIG_b = new cl::Buffer(*context,NULL,Z*Z*N*M*sizeof(cl_float));
+	PI_b = new cl::Buffer(*context,NULL,N*sizeof(real_t));
+	A_b = new cl::Buffer(*context,NULL,N*N*sizeof(real_t));
+	TAU_b = new cl::Buffer(*context,NULL,N*M*sizeof(real_t));
+	MU_b = new cl::Buffer(*context,NULL,Z*N*M*sizeof(real_t));
+	SIG_b = new cl::Buffer(*context,NULL,Z*Z*N*M*sizeof(real_t));
 	// начальные приближения
-	PI1_b = new cl::Buffer(*context,CL_MEM_COPY_HOST_PTR,N*sizeof(cl_float),PI1);
-	A1_b = new cl::Buffer(*context,CL_MEM_COPY_HOST_PTR,N*N*sizeof(cl_float),A1);
-	TAU1_b = new cl::Buffer(*context,CL_MEM_COPY_HOST_PTR,N*M*sizeof(cl_float),TAU1);
-	MU1_b = new cl::Buffer(*context,CL_MEM_COPY_HOST_PTR,N*M*Z*NumInit*sizeof(cl_float),MU1);
-	SIG1_b = new cl::Buffer(*context,CL_MEM_COPY_HOST_PTR,N*M*Z*Z*NumInit*sizeof(cl_float),SIG1);
+	PI1_b = new cl::Buffer(*context,CL_MEM_COPY_HOST_PTR,N*sizeof(real_t),PI1);
+	A1_b = new cl::Buffer(*context,CL_MEM_COPY_HOST_PTR,N*N*sizeof(real_t),A1);
+	TAU1_b = new cl::Buffer(*context,CL_MEM_COPY_HOST_PTR,N*M*sizeof(real_t),TAU1);
+	MU1_b = new cl::Buffer(*context,CL_MEM_COPY_HOST_PTR,N*M*Z*NumInit*sizeof(real_t),MU1);
+	SIG1_b = new cl::Buffer(*context,CL_MEM_COPY_HOST_PTR,N*M*Z*Z*NumInit*sizeof(real_t),SIG1);
 	// наблюдения
-	Otr_b = new cl::Buffer(*context,CL_MEM_COPY_HOST_PTR,K*T*Z*sizeof(cl_float),Otr);
+	Otr_b = new cl::Buffer(*context,CL_MEM_COPY_HOST_PTR,K*T*Z*sizeof(real_t),Otr);
 	// вспомогательные массивы
-	alf_b = new cl::Buffer(*context,NULL,T*N*K*sizeof(cl_float));
-	bet_b = new cl::Buffer(*context,NULL,T*N*K*sizeof(cl_float));
-	c_b = new cl::Buffer(*context,NULL,T*K*sizeof(cl_float));
-	ksi_b = new cl::Buffer(*context,NULL,T*N*N*K*sizeof(cl_float));
-	gam_b = new cl::Buffer(*context,NULL,T*N*K*sizeof(cl_float));
-	gamd_b = new cl::Buffer(*context,NULL,T*N*M*K*sizeof(cl_float));
-	alf_t_b = new cl::Buffer(*context,NULL,T*N*K*sizeof(cl_float));
-	bet_t_b = new cl::Buffer(*context,NULL,T*N*K*sizeof(cl_float));
-	B_b = new cl::Buffer(*context,NULL,N*T*K*sizeof(cl_float));
+	alf_b = new cl::Buffer(*context,NULL,T*N*K*sizeof(real_t));
+	bet_b = new cl::Buffer(*context,NULL,T*N*K*sizeof(real_t));
+	c_b = new cl::Buffer(*context,NULL,T*K*sizeof(real_t));
+	ksi_b = new cl::Buffer(*context,NULL,T*N*N*K*sizeof(real_t));
+	gam_b = new cl::Buffer(*context,NULL,T*N*K*sizeof(real_t));
+	gamd_b = new cl::Buffer(*context,NULL,T*N*M*K*sizeof(real_t));
+	alf_t_b = new cl::Buffer(*context,NULL,T*N*K*sizeof(real_t));
+	bet_t_b = new cl::Buffer(*context,NULL,T*N*K*sizeof(real_t));
+	B_b = new cl::Buffer(*context,NULL,N*T*K*sizeof(real_t));
 	// временный массив
-	gam_sum_b = new cl::Buffer(*context,NULL,N*sizeof(cl_float));
-	gamd_sum_b = new cl::Buffer(*context,NULL,M*N*sizeof(cl_float));
+	gam_sum_b = new cl::Buffer(*context,NULL,N*sizeof(real_t));
+	gamd_sum_b = new cl::Buffer(*context,NULL,M*N*sizeof(real_t));
 	// флаг ошибки
 	flag_b = new cl::Buffer(*context,NULL,sizeof(cl_int));
 	// g
-	g_b = new cl::Buffer(*context,NULL,T*K*N*M*NumInit*sizeof(cl_float));
+	g_b = new cl::Buffer(*context,NULL,T*K*N*M*NumInit*sizeof(real_t));
 }
 
 /*void HMM::showInfo()
@@ -156,12 +156,12 @@ void HMM::bindOpenCL(cl::Context * context_, std::map<std::string,cl::Kernel*> &
 	std::cerr << "maxParameterSize = " << maxParameterSize << " bytes" << std::endl;
 	// расширения
 	//std::string extensionsList;
-	//devices[i].getInfo(CL_DEVICE_EXTENSIONS,&extensionsList);		//TODO: включать cl_float, если такое расширение доступно
+	//devices[i].getInfo(CL_DEVICE_EXTENSIONS,&extensionsList);		//TODO: включать real_t, если такое расширение доступно
 	kernel->getWorkGroupInfo(devices[0],CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE,&prefWorkGroupSizeMul);	
 }*/
 
 // вспомогательная функция
-void copyArray(cl_float * dest, cl_float * source, cl_int n)
+void copyArray(real_t * dest, real_t * source, cl_int n)
 {
 	for(cl_int i=0; i<n; i++)
 		dest[i]=source[i];
@@ -171,7 +171,7 @@ void HMM::findModelParameters()
 {
 	cl_int err;
 	// выполним Баума Велша для всех начальных приближений и выбираем лучший набор параметров
-	cl_float p, p0 = -1000000000000000.;
+	real_t p, p0 = -1000000000000000.;
 	// n - номер приближения
 	for(cl_int n=0; n<NumInit; n++)
 	{
@@ -179,15 +179,15 @@ void HMM::findModelParameters()
 		if(p>p0)
 		{
 			// TODO: load pi,a,tau,mu,sig from gpu and save here
-			cl_int err = queue->enqueueReadBuffer(*PI_b, CL_TRUE, 0, N*sizeof(cl_float), PI);	
+			cl_int err = queue->enqueueReadBuffer(*PI_b, CL_TRUE, 0, N*sizeof(real_t), PI);	
 			checkErr(err, "enqueueReadBuffer() - PI_b");
-			err = queue->enqueueReadBuffer(*A_b, CL_TRUE, 0, N*N*sizeof(cl_float), A);	
+			err = queue->enqueueReadBuffer(*A_b, CL_TRUE, 0, N*N*sizeof(real_t), A);	
 			checkErr(err, "enqueueReadBuffer() - A_b");
-			err = queue->enqueueReadBuffer(*TAU_b, CL_TRUE, 0, N*M*sizeof(cl_float), TAU);	
+			err = queue->enqueueReadBuffer(*TAU_b, CL_TRUE, 0, N*M*sizeof(real_t), TAU);	
 			checkErr(err, "enqueueReadBuffer() - TAU_b");
-			err = queue->enqueueReadBuffer(*MU_b, CL_TRUE, 0, Z*N*M*sizeof(cl_float), MU);	
+			err = queue->enqueueReadBuffer(*MU_b, CL_TRUE, 0, Z*N*M*sizeof(real_t), MU);	
 			checkErr(err, "enqueueReadBuffer() - MU_b");
-			err = queue->enqueueReadBuffer(*SIG_b, CL_TRUE, 0, Z*Z*N*M*sizeof(cl_float), SIG);	
+			err = queue->enqueueReadBuffer(*SIG_b, CL_TRUE, 0, Z*Z*N*M*sizeof(real_t), SIG);	
 			checkErr(err, "enqueueReadBuffer() - SIG_b");
 			p0=p;
 		}
@@ -213,25 +213,25 @@ void HMM::findModelParameters()
 	}*/
 
 	// back to gpu
-	err = queue->enqueueWriteBuffer(*PI_b, CL_TRUE, 0, N*sizeof(cl_float), PI);	
+	err = queue->enqueueWriteBuffer(*PI_b, CL_TRUE, 0, N*sizeof(real_t), PI);	
 	checkErr(err, "enqueueReadBuffer() - PI_b");
-	err = queue->enqueueWriteBuffer(*A_b, CL_TRUE, 0, N*N*sizeof(cl_float), A);	
+	err = queue->enqueueWriteBuffer(*A_b, CL_TRUE, 0, N*N*sizeof(real_t), A);	
 	checkErr(err, "enqueueReadBuffer() - A_b");
-	err = queue->enqueueWriteBuffer(*TAU_b, CL_TRUE, 0, N*M*sizeof(cl_float), TAU);	
+	err = queue->enqueueWriteBuffer(*TAU_b, CL_TRUE, 0, N*M*sizeof(real_t), TAU);	
 	checkErr(err, "enqueueReadBuffer() - TAU_b");
-	err = queue->enqueueWriteBuffer(*MU_b, CL_TRUE, 0, Z*N*M*sizeof(cl_float), MU);	
+	err = queue->enqueueWriteBuffer(*MU_b, CL_TRUE, 0, Z*N*M*sizeof(real_t), MU);	
 	checkErr(err, "enqueueReadBuffer() - MU_b");
-	err = queue->enqueueWriteBuffer(*SIG_b, CL_TRUE, 0, Z*Z*N*M*sizeof(cl_float), SIG);	
+	err = queue->enqueueWriteBuffer(*SIG_b, CL_TRUE, 0, Z*Z*N*M*sizeof(real_t), SIG);	
 	checkErr(err, "enqueueReadBuffer() - SIG_b");
 }
 
-void HMM::classifyObservations(cl_float * p)
+void HMM::classifyObservations(real_t * p)
 {
 	// внутренние вычисления
 	internal_calculations(-1);
 
 	// get c from GPU
-	cl_int err = queue->enqueueReadBuffer(*c_b, CL_TRUE, 0, T*K*sizeof(cl_float), c);	
+	cl_int err = queue->enqueueReadBuffer(*c_b, CL_TRUE, 0, T*K*sizeof(real_t), c);	
 	checkErr(err, "enqueueReadBuffer() - c_b");
 
 	// кернел 5  (параллел)
@@ -246,11 +246,11 @@ void HMM::classifyObservations(cl_float * p)
 			p[k]-=log(c(t,k));
 }
 
-/*cl_float HMM::g(cl_int t,cl_int k,cl_int i,cl_int m,cl_int n)
+/*real_t HMM::g(cl_int t,cl_int k,cl_int i,cl_int m,cl_int n)
 {
 	//работаем с диагональными ковариационными матрицами
-	cl_float det=1.,res=0.;
-	cl_float tmp1,tmp2;
+	real_t det=1.,res=0.;
+	real_t tmp1,tmp2;
 	if (n==-1) //работа с уже полученными параметрами модели 
 	{
 		for (cl_int z=0;z<Z;z++)
@@ -272,21 +272,21 @@ void HMM::classifyObservations(cl_float * p)
 		}
 	}
 	res*=-0.5;
-	res= (cl_float) exp(res)/sqrt((cl_float)pow(2.*pi,Z)*det);
+	res= (real_t) exp(res)/sqrt((real_t)pow(2.*pi,Z)*det);
 	return res;
 
 }*/
 
-cl_float HMM::calcBaumWelсh(cl_int n)
+real_t HMM::calcBaumWelсh(cl_int n)
 {
 	cl_int err;
 	cl_int T1=T-1;
 	cl::Event last_event;
 
-	/*cl_float * gam_sum = new cl_float[N];
-	cl_float * gamd_sum = new cl_float[N*M];
-	cl_float * tmp3 = new cl_float[Z];
-	cl_float tmp2;*/
+	/*real_t * gam_sum = new real_t[N];
+	real_t * gamd_sum = new real_t[N*M];
+	real_t * tmp3 = new real_t[Z];
+	real_t tmp2;*/
 	//vector<double> tmp3(Z);
 
 	for(cl_int iter=0;iter<5;iter++)
@@ -425,7 +425,7 @@ void HMM::internal_calculations(cl_int n)
 	cl::Event event;
 	cl_int err;
 	cl_int T1=T-1;
-	cl_float * TAU_used, * A_used, * PI_used, * SIG_used, * MU_used;
+	real_t * TAU_used, * A_used, * PI_used, * SIG_used, * MU_used;
 	cl::Buffer * TAU_used_b, * A_used_b, * PI_used_b, *SIG_used_b, * MU_used_b;
 	if (n==-1){
 		TAU_used = TAU; TAU_used_b = TAU_b;
@@ -472,8 +472,8 @@ void HMM::internal_calculations(cl_int n)
 	checkErr(err, "calcB");
 
 	// DEBUG - EVERYTHING IS OK!
-	/*cl_float * B_dbg = new cl_float[N*T*K];
-	err = queue->enqueueReadBuffer(*B_b, CL_TRUE, 0, N*T*K*sizeof(cl_float), B_dbg);	
+	/*real_t * B_dbg = new real_t[N*T*K];
+	err = queue->enqueueReadBuffer(*B_b, CL_TRUE, 0, N*T*K*sizeof(real_t), B_dbg);	
 	checkErr(err, "enqueueReadBuffer() - B_b");
 	std::fstream f;
 	f.open("debugging_B.txt",std::fstream::out);
@@ -528,11 +528,11 @@ void HMM::internal_calculations(cl_int n)
 	}
 
 	// DEBUG alf, alf_t
-	/*cl_float * alf_dbg = new cl_float[N*T*K];
-	err = queue->enqueueReadBuffer(*alf_b, CL_TRUE, 0, N*T*K*sizeof(cl_float), alf_dbg);	
+	/*real_t * alf_dbg = new real_t[N*T*K];
+	err = queue->enqueueReadBuffer(*alf_b, CL_TRUE, 0, N*T*K*sizeof(real_t), alf_dbg);	
 	checkErr(err, "enqueueReadBuffer() - alf_b");
-	cl_float * alf_t_dbg = new cl_float[N*T*K];
-	err = queue->enqueueReadBuffer(*alf_t_b, CL_TRUE, 0, N*T*K*sizeof(cl_float), alf_t_dbg);
+	real_t * alf_t_dbg = new real_t[N*T*K];
+	err = queue->enqueueReadBuffer(*alf_t_b, CL_TRUE, 0, N*T*K*sizeof(real_t), alf_t_dbg);
 	checkErr(err, "enqueueReadBuffer() - alf_t_b");
 	f.open("debugging_alf.txt",std::fstream::out);
 	for (cl_int i=0; i<N*T*K; i++)
@@ -610,12 +610,12 @@ void HMM::internal_calculations(cl_int n)
 	checkErr(err, "k_2_7");
 }
 
-cl_float HMM::calcProbability()
+real_t HMM::calcProbability()
 {
 	// TODO: загрузка массива c from GPU
-	cl_int err = queue->enqueueReadBuffer(*c_b, CL_TRUE, 0, T*K*sizeof(cl_float), c);	
+	cl_int err = queue->enqueueReadBuffer(*c_b, CL_TRUE, 0, T*K*sizeof(real_t), c);	
 	checkErr(err, "enqueueReadBuffer() - c_b");
-	cl_float res=0;
+	real_t res=0;
 	for(cl_int k=0;k<K;k++)
 		for(cl_int t=0;t<T;t++)
 			res -= log(c(t,k));
@@ -633,7 +633,7 @@ void HMM::getTestObserv(std::string fname)
 	f.close();
 
 	// load them to GPU
-	cl_int err = queue->enqueueWriteBuffer(*Otr_b, CL_TRUE, 0, K*T*Z*sizeof(cl_float), Otr);	
+	cl_int err = queue->enqueueWriteBuffer(*Otr_b, CL_TRUE, 0, K*T*Z*sizeof(real_t), Otr);	
 	checkErr(err, "enqueueWritedBuffer() - Otr_b");
 }
 
