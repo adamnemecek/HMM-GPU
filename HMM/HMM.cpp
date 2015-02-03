@@ -282,6 +282,7 @@ real_t HMM::calcBaumWelñh(cl_int n)
 	cl_int err;
 	cl_int T1=T-1;
 	cl::Event last_event;
+	std::fstream f; // debug
 
 	/*real_t * gam_sum = new real_t[N];
 	real_t * gamd_sum = new real_t[N*M];
@@ -339,6 +340,24 @@ real_t HMM::calcBaumWelñh(cl_int n)
 				//checkErr(err, "enqueueReadBuffer() - flag_b");
 			}
 
+		// DEBUG - gam_sum, gamd_sum - no error
+		/*std::fstream f;
+		real_t * gam_sum_dbg = new real_t[N];
+		err = queue->enqueueReadBuffer(*gam_sum_b, CL_TRUE, 0, N*sizeof(real_t), gam_sum_dbg);
+		checkErr(err, "enqueueReadBuffer() - gam_sum_b");
+		f.open("debugging_gam_sum.txt",std::fstream::out);
+		for (cl_int i=0; i<N; i++)
+			f << gam_sum_dbg[i] << std::endl;
+		f.close();
+		real_t * gamd_sum_dbg = new real_t[N*M];
+		err = queue->enqueueReadBuffer(*gamd_sum_b, CL_TRUE, 0, N*M*sizeof(real_t), gamd_sum_dbg);
+		checkErr(err, "enqueueReadBuffer() - gamd_sum_b");
+		f.open("debugging_gamd_sum.txt", std::fstream::out);
+		for (cl_int i = 0; i<N*M; i++)
+			f << gamd_sum_dbg[i] << std::endl;
+		f.close();*/
+		// /DEBUG
+
 		// check F
 		//if(flag < 0) 
 			//break;
@@ -348,6 +367,16 @@ real_t HMM::calcBaumWelñh(cl_int n)
 		kernel->setArg(0,N); kernel->setArg(1,K); kernel->setArg(2,*PI_b); kernel->setArg(3,*gam_b);
 		err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N), cl::NullRange);
 		checkErr(err, "k_3_3");
+
+		// DEBUG - PI - good
+		/*real_t * PI_dbg = new real_t[N];
+		err = queue->enqueueReadBuffer(*PI_b, CL_TRUE, 0, N*sizeof(real_t), PI_dbg);
+		checkErr(err, "enqueueReadBuffer() - PI_b");
+		f.open("debugging_PI.txt",std::fstream::out);
+		for (cl_int i=0; i<N; i++)
+		f << PI_dbg[i] << std::endl;
+		f.close();*/
+		// DEBUG
 		
 		// êåðíåë 3.4
 		kernel = kernels["k_3_4"];
@@ -357,12 +386,32 @@ real_t HMM::calcBaumWelñh(cl_int n)
 		err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N, N), cl::NullRange);
 		checkErr(err, "k_3_4");
 
+		// DEBUG - A - good
+		/*real_t * A_dbg = new real_t[N*N];
+		err = queue->enqueueReadBuffer(*A_b, CL_TRUE, 0, N*N*sizeof(real_t), A_dbg);
+		checkErr(err, "enqueueReadBuffer() - A_b");
+		f.open("debugging_A.txt",std::fstream::out);
+		for (cl_int i=0; i<N*N; i++)
+		f << A_dbg[i] << std::endl;*/
+		f.close();
+		// DEBUG
+
 		// êåðíåë 3.5
 		kernel = kernels["k_3_5"];
 		kernel->setArg(0,M); kernel->setArg(1,*TAU_b); kernel->setArg(2,*gamd_sum_b);
 		kernel->setArg(3,*gam_sum_b);
 		err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N, M), cl::NullRange);
 		checkErr(err, "k_3_5");
+
+		// DEBUG - TAU - good
+		/*real_t * TAU_dbg = new real_t[N*M];
+		err = queue->enqueueReadBuffer(*TAU_b, CL_TRUE, 0, N*M*sizeof(real_t), TAU_dbg);
+		checkErr(err, "enqueueReadBuffer() - TAU_b");
+		f.open("debugging_TAU.txt",std::fstream::out);
+		for (cl_int i=0; i<N*M; i++)
+			f << TAU_dbg[i] << std::endl;
+		f.close();*/
+		// DEBUG
 		
 		// êåðíåë 3.6
 		kernel = kernels["k_3_6"];
@@ -373,6 +422,16 @@ real_t HMM::calcBaumWelñh(cl_int n)
 		err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N, Z, M), cl::NullRange);
 		checkErr(err, "k_3_6");
 
+		// DEBUG - MU - good
+		/*real_t * MU_dbg = new real_t[N*M*Z];
+		err = queue->enqueueReadBuffer(*MU_b, CL_TRUE, 0, N*M*Z*sizeof(real_t), MU_dbg);
+		checkErr(err, "enqueueReadBuffer() - MU_b");
+		f.open("debugging_MU.txt",std::fstream::out);
+		for (cl_int i=0; i<N*M*Z; i++)
+		f << MU_dbg[i] << std::endl;
+		f.close();*/
+		// DEBUG
+
 		// êåðíåë 3.7
 		kernel = kernels["k_3_7"];
 		kernel->setArg(0,N); kernel->setArg(1,M); kernel->setArg(2,Z);
@@ -382,6 +441,16 @@ real_t HMM::calcBaumWelñh(cl_int n)
 		kernel->setArg(8,*MU_b); kernel->setArg(9,*Otr_b);
 		err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N, Z*Z, M), cl::NullRange);
 		checkErr(err, "k_3_7");
+
+		// DEBUG - SIG - good
+		/*real_t * SIG_dbg = new real_t[N*M*Z*Z];
+		err = queue->enqueueReadBuffer(*SIG_b, CL_TRUE, 0, N*M*Z*Z*sizeof(real_t), SIG_dbg);
+		checkErr(err, "enqueueReadBuffer() - SIG_b");
+		f.open("debugging_SIG.txt",std::fstream::out);
+		for (cl_int i=0; i<N*M*Z*Z; i++)
+			f << SIG_dbg[i] << std::endl;
+		f.close();*/
+		// DEBUG
 		
 		// êåðíåë 3.8
 		kernel = kernels["k_3_8"];
@@ -408,9 +477,19 @@ real_t HMM::calcBaumWelñh(cl_int n)
 		kernel = kernels["k_3_12"];
 		kernel->setArg(0,N); kernel->setArg(1,M); kernel->setArg(2,Z);
 		kernel->setArg(3,n); kernel->setArg(4,*SIG1_b); kernel->setArg(5,*SIG_b);
-		
 		err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N,M,Z*Z),cl::NullRange,NULL,&last_event);
 		checkErr(err, "k_3_12");	
+
+		// DEBUG - SIG1 - good
+		/*std::fstream f;
+		real_t * SIG1_dbg = new real_t[N*M*Z*Z];
+		err = queue->enqueueReadBuffer(*SIG1_b, CL_TRUE, 0, N*M*Z*Z*sizeof(real_t), SIG1_dbg);
+		checkErr(err, "enqueueReadBuffer() - SIG_b");
+		f.open("debugging_SIG1.txt", std::fstream::out);
+		for (cl_int i = 0; i<N*M*Z*Z; i++)
+			f << SIG1_dbg[i] << std::endl;
+		f.close();*/
+		// DEBUG
 	}
 	
 	// load c here from GPU
@@ -442,7 +521,7 @@ void HMM::internal_calculations(cl_int n)
 		MU_used = MU1;	MU_used_b = MU1_b;	
 	}
 
-	// êåðíåë calc_G
+	// êåðíåë calc_G (çàðàíåå ñ÷èòàåì âñå g)
 	cl::Kernel * kernel = kernels["calc_g"];
 	kernel->setArg(0,n); kernel->setArg(1,N);
 	kernel->setArg(2,M); kernel->setArg(3,Z);
@@ -471,7 +550,7 @@ void HMM::internal_calculations(cl_int n)
 		cl::NullRange);
 	checkErr(err, "calcB");
 
-	// DEBUG - EVERYTHING IS OK!
+	// DEBUG - satisfying
 	/*real_t * B_dbg = new real_t[N*T*K];
 	err = queue->enqueueReadBuffer(*B_b, CL_TRUE, 0, N*T*K*sizeof(real_t), B_dbg);	
 	checkErr(err, "enqueueReadBuffer() - B_b");
@@ -480,7 +559,7 @@ void HMM::internal_calculations(cl_int n)
 	for (cl_int i=0; i<N*T*K; i++)
 		f << B_dbg[i] << std::endl;
 	f.close();*/
-	// /DEBUG - EVERYTHING IS OK!
+	// /DEBUG
 
 	// êåðíåë 2.1
 	kernel = kernels["k_2_1"];
@@ -494,8 +573,6 @@ void HMM::internal_calculations(cl_int n)
 		cl::NDRange(N,T,K),
 		cl::NullRange);
 	checkErr(err, "k_2_1");
-
-
 
 	// êåðíåë 2.2 (set_var)
 	kernel = kernels["k_2_2"];
@@ -527,13 +604,14 @@ void HMM::internal_calculations(cl_int n)
 		checkErr(err, "k_2_3_2");
 	}
 
-	// DEBUG alf, alf_t
+	// DEBUG alf, alf_t - satisfying
 	/*real_t * alf_dbg = new real_t[N*T*K];
 	err = queue->enqueueReadBuffer(*alf_b, CL_TRUE, 0, N*T*K*sizeof(real_t), alf_dbg);	
 	checkErr(err, "enqueueReadBuffer() - alf_b");
 	real_t * alf_t_dbg = new real_t[N*T*K];
 	err = queue->enqueueReadBuffer(*alf_t_b, CL_TRUE, 0, N*T*K*sizeof(real_t), alf_t_dbg);
 	checkErr(err, "enqueueReadBuffer() - alf_t_b");
+	std::fstream f;
 	f.open("debugging_alf.txt",std::fstream::out);
 	for (cl_int i=0; i<N*T*K; i++)
 		f << alf_dbg[i] << std::endl;
@@ -552,9 +630,6 @@ void HMM::internal_calculations(cl_int n)
 	err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(T1, K), cl::NullRange);
 	checkErr(err, "k_2_3_3");
 
-	
-
-
 	// êåðíåë 2.4 (set_var)
 	kernel = kernels["k_2_4"];
 	kernel->setArg(0,N); kernel->setArg(1,K);
@@ -563,6 +638,16 @@ void HMM::internal_calculations(cl_int n)
 	err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N, K), cl::NullRange);
 	checkErr(err, "k_2_4");
 	
+	// DEBUG c - satisfying
+	/*real_t * c_dbg = new real_t[T*K];
+	err = queue->enqueueReadBuffer(*c_b, CL_TRUE, 0, T*K*sizeof(real_t), c_dbg);
+	checkErr(err, "enqueueReadBuffer() - c_b");
+	std::fstream f;
+	f.open("debugging_c.txt",std::fstream::out);
+	for (cl_int i=0; i<T*K; i++)
+	f << c_dbg[i] << std::endl;
+	f.close();*/
+	// /DEBUG
 
 	// êåðíåë 2.5 (áîëüøîé)
 	kernel1 = kernels["k_2_5_1"];
@@ -586,7 +671,24 @@ void HMM::internal_calculations(cl_int n)
 		checkErr(err, "k_2_5_2");
 	}
 
-		
+	// DEBUG bet, bet_t - satisfying
+	/*std::fstream f;
+	real_t * bet_dbg = new real_t[N*T*K];
+	err = queue->enqueueReadBuffer(*bet_b, CL_TRUE, 0, N*T*K*sizeof(real_t), bet_dbg);
+	checkErr(err, "enqueueReadBuffer() - bet_b");
+	f.open("debugging_bet.txt",std::fstream::out);
+	for (cl_int i=0; i<N*T*K; i++)
+		f << bet_dbg[i] << std::endl;
+	f.close();
+	real_t * bet_t_dbg = new real_t[N*T*K];
+	err = queue->enqueueReadBuffer(*bet_t_b, CL_TRUE, 0, N*T*K*sizeof(real_t), bet_t_dbg);
+	checkErr(err, "enqueueReadBuffer() - bet_t_b");
+	f.open("debugging_bet_t.txt", std::fstream::out);
+	for (cl_int i = 0; i<N*T*K; i++)
+		f << bet_t_dbg[i] << std::endl;
+	f.close();*/
+	// /DEBUG
+
 	// êåðíåë 2.6 
 	kernel = kernels["k_2_6"];
 	kernel->setArg(0,n); kernel->setArg(1,N);
@@ -600,6 +702,24 @@ void HMM::internal_calculations(cl_int n)
 	err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N, T, K), cl::NullRange);
 	checkErr(err, "k_2_6");
 
+	// DEBUG gam, gamd - satisfying
+	/*std::fstream f;
+	real_t * gam_dbg = new real_t[N*T*K];
+	err = queue->enqueueReadBuffer(*gam_b, CL_TRUE, 0, N*T*K*sizeof(real_t), gam_dbg);
+	checkErr(err, "enqueueReadBuffer() - gam_b");
+	f.open("debugging_gam.txt",std::fstream::out);
+	for (cl_int i=0; i<N*T*K; i++)
+	f << gam_dbg[i] << std::endl;
+	f.close();
+	real_t * gamd_dbg = new real_t[N*M*T*K];
+	err = queue->enqueueReadBuffer(*gamd_b, CL_TRUE, 0, N*M*T*K*sizeof(real_t), gamd_dbg);
+	checkErr(err, "enqueueReadBuffer() - gamd_b");
+	f.open("debugging_gamd.txt", std::fstream::out);
+	for (cl_int i = 0; i<N*M*T*K; i++)
+	f << gamd_dbg[i] << std::endl;
+	f.close();*/
+	// /DEBUG
+
 	// êåðíåë 2.7 (set_var)
 	kernel = kernels["k_2_7"];
 	kernel->setArg(0,N); kernel->setArg(1,K);
@@ -608,6 +728,17 @@ void HMM::internal_calculations(cl_int n)
 	kernel->setArg(6,*B_b); kernel->setArg(7,*bet_b);
 	err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N*N, T1, K), cl::NullRange);
 	checkErr(err, "k_2_7");
+
+	// DEBUG ksi - satisfying
+	/*std::fstream f;
+	real_t * ksi_dbg = new real_t[N*N*T1*K];
+	err = queue->enqueueReadBuffer(*ksi_b, CL_TRUE, 0, N*N*T1*K*sizeof(real_t), ksi_dbg);
+	checkErr(err, "enqueueReadBuffer() - ksi_b");
+	f.open("debugging_ksi.txt",std::fstream::out);
+	for (cl_int i=0; i<N*N*T1*K; i++)
+	f << ksi_dbg[i] << std::endl;
+	f.close();*/
+	// /DEBUG
 }
 
 real_t HMM::calcProbability()

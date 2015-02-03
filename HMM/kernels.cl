@@ -115,6 +115,8 @@ __kernel void calcB(int n,
 	size_t t = get_global_id(1);
 	size_t k = get_global_id(2);
 	B(i,t,k)=0.0f;
+	if (n == -1)
+		n = 0;
 	for(m=0; m<M; m++)
 		B(i,t,k) += TAU(i,m)*g(t,k,i,m,n);
 	if(!isfinite(B(i,t,k)))
@@ -340,7 +342,7 @@ __kernel void k_3_2_2(
 {
 	size_t i = get_global_id(0);
 	size_t m = get_global_id(1);
-	real_t ttt = gamd_sum[i*M+m] += gamd(t,i,m,k);
+	real_t ttt = gamd_sum[i*M+m] + gamd(t,i,m,k);
 	if(isfinite(ttt))
 		gamd_sum[i*M+m]+=gamd(t,i,m,k);
 	//if (!isfinite(gamd_sum[i*M+m]))
