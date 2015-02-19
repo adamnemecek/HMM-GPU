@@ -58,7 +58,8 @@
 //#define pi 3.1415926535897932384626433832795f
 
 
-// ПРОТАБУЛИРОВАТЬ g ЗАРАНЕЕ!!!
+// g табулируется заранее
+// ()
 __kernel void calc_g(
 		int n,
 		int N, int M, int Z, int T, int K,
@@ -70,7 +71,7 @@ __kernel void calc_g(
 	size_t t = get_global_id(0);
 	size_t k = get_global_id(1);
 	size_t im = get_global_id(2);
-	size_t i,m;// = im%N, m = im%M;   /// error!
+	size_t i,m;// = im%N, m = im%M;		/// TODO: check
 	if (M > N){
 			m = im % M; i = im / M;
 	}else {
@@ -78,17 +79,12 @@ __kernel void calc_g(
 	}
 
 	int z;
-	real_t det=1.0f,res=0.0f;
-	//real_t tmp1,tmp2;
+	real_t det = 1.0f, res = 0.0f;		// TODO: whyyyy det=1???
+
 	if (n==-1)
 		n=0;
-	for (z=0;z<Z;z++)
+	for (z=0; z<Z; z++)
 	{
-		//tmp1 = SIG1(z,z,i,m,n);
-		//det *= tmp1;
-		//tmp2 = Otr(k,t,z)-MU1(z,i,m,n);
-		//res += tmp2*tmp2/tmp1;
-		det *= SIG1(z,z,i,m,n);
 		res += ( Otr(k,t,z)-MU1(z,i,m,n))*( Otr(k,t,z)-MU1(z,i,m,n))/SIG1(z,z,i,m,n);
 	}
 	res *= -0.5f;
@@ -102,6 +98,7 @@ __kernel void calc_g(
 	g(t,k,i,m,n) = res;
 }
 
+// (49) - (2)
 __kernel void calcB(int n, 
 					int N, int M, int Z, int T, int K, 
 					__global real_t * TAU, 
@@ -194,7 +191,7 @@ __kernel void k_2_3_3(int N, int K,
 	size_t t = get_global_id(0);
 	size_t k = get_global_id(1);
 	for(i=0; i<N; i++){
-		c(t,k) = alf(t,i,k) / alf_t(t,i,k);
+		c(t,k) = alf(t,i,k) / alf_t(t,i,k);		// TODO: strange
 		if(isfinite(c(t,k)))
 			break;
 	}
@@ -228,6 +225,7 @@ __kernel void k_2_4(int N, int K, int T1,
 }
 
 
+// TODO: почему бы 2_5_1 и 2_5_2 не объединить?
 __kernel void k_2_5_1( int t, int N, int K,
 					  __global real_t * bet_t, 
 					  __global real_t * c,
@@ -275,12 +273,12 @@ __kernel void k_2_6(int n,
 	size_t i = get_global_id(0);
 	size_t t = get_global_id(1);
 	size_t k = get_global_id(2);
-	gam(t,i,k) = alf(t,i,k) * bet(t,i,k);
+	gam(t,i,k) = alf(t,i,k) * bet(t,i,k);		// TODO: check, not corresponds with formula
 	real_t atsum = 0.0f;
 	for(m=0; m<M; m++)
-		atsum += TAU(i,m)*g(t,k,i,m,n);		//2 times g()
-	for(m=0; m<M; m++){
-		gamd(t,i,m,k)=TAU(i,m)*g(t,k,i,m,n)*gam(t,i,k)/atsum;	//again g()
+		atsum += TAU(i,m)*g(t,k,i,m,n);			
+	for(m=0; m<M; m++){							// TODO: can be parralelized
+		gamd(t,i,m,k) = TAU(i,m) * g(t,k,i,m,n) * gam(t,i,k) / atsum;	
 		if(!isfinite(gamd(t,i,m,k)))
 			gamd(t,i,m,k)=TAU(i,m)*gam(t,i,k);
 	}
@@ -297,10 +295,9 @@ __kernel void k_2_7(int N, int K, int T,
 	int j,i;
 	size_t ii = get_global_id(0);
 	size_t t = get_global_id(1);
-	size_t k = get_global_id(2);		// Optimize !!!
+	size_t k = get_global_id(2);		
 	i = ii/N; j = ii%N;
-	//for(j=0; j<N; j++)
-		ksi(t,i,j,k)=alf(t,i,k)*A(i,j)*B(j,t+1,k)*bet(t+1,j,k);
+	ksi(t,i,j,k)=alf(t,i,k)*A(i,j)*B(j,t+1,k)*bet(t+1,j,k);
 }
 
 
@@ -326,9 +323,7 @@ __kernel void k_3_2_1(
 					)
 {
 	size_t i = get_global_id(0);
-	gam_sum[i] += gam(t,i,k);	///???
-	//if(!isfinite(gam_sum[i]))
-	//	atomic_dec(flag);
+	gam_sum[i] += gam(t, i, k);
 }
 
 __kernel void k_3_2_2(
@@ -345,8 +340,6 @@ __kernel void k_3_2_2(
 	real_t ttt = gamd_sum[i*M+m] + gamd(t,i,m,k);
 	if(isfinite(ttt))
 		gamd_sum[i*M+m]+=gamd(t,i,m,k);
-	//if (!isfinite(gamd_sum[i*M+m]))
-	//	atomic_dec(flag);
 }
 
 __kernel void k_3_3(int N, int K, __global real_t * PI, __global real_t * gam)
@@ -356,7 +349,7 @@ __kernel void k_3_3(int N, int K, __global real_t * PI, __global real_t * gam)
 	PI[i] = 0.0f;
 	for(k=0;k<K;k++)
 	{
-		PI[i] += gam(0,i,k);
+		PI[i] += gam(0,i,k);					// 1d-редукция
 	}
 	PI[i]/=K;
 }
@@ -371,7 +364,7 @@ __kernel void k_3_4(
 	size_t i = get_global_id(0);
 	size_t j = get_global_id(1);
 	real_t tmp2 = 0.0f;
-	for(k=0; k<K; k++)
+	for(k=0; k<K; k++)							// 2d-редукция
 		for(t=0; t<T1; t++)
 			tmp2 += ksi(t,i,j,k)*c(t+1,k);
 	A(i,j) = tmp2 / gam_sum[i];
@@ -399,10 +392,10 @@ __kernel void k_3_6(
 	size_t m = get_global_id(2);
 	real_t ttt;
 	MU(z,i,m)=0.0f;
-	for(k=0; k<K; k++)
-		for(t=0; t<T;t++)
+	for(k=0; k<K; k++)									// 2d-редукция
+		for(t=0; t<T;t++)								
 		{
-			ttt = MU(z,i,m) + gamd(t,i,m,k)*Otr(k,t,z);	// opt
+			ttt = MU(z,i,m) + gamd(t,i,m,k)*Otr(k,t,z);
 			if(isfinite(ttt))
 				MU(z,i,m) += gamd(t,i,m,k)*Otr(k,t,z);
 		}
@@ -422,11 +415,9 @@ __kernel void k_3_7(
 	int k,t; real_t ttt, tmp3;
 	size_t z1 = z / Z, z2 = z % Z;
 	SIG(z1,z2,i,m) = 0.0f;
-	for(k=0; k<K; k++)
+	for(k=0; k<K; k++)										// 2d-редукция
 		for(t=0; t<T; t++)
 		{
-			//for(z3=0; z3<Z; z3++)
-				//tmp3[z3] = Otr(k,t,z3) - MU(z3,i,m);		//optimize!!
 			tmp3 = (Otr(k,t,z1) - MU(z1,i,m)) * (Otr(k,t,z2) - MU(z2,i,m));	
 			ttt = SIG(z1,z2,i,m) + gamd(t,i,m,k)*tmp3;
 			if(isfinite(ttt))

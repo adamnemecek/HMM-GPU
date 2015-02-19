@@ -175,7 +175,9 @@ void HMM::findModelParameters()
 	// n - номер приближения
 	for(cl_int n=0; n<NumInit; n++)
 	{
+		// оценим по алгоритму Баума-Велша параметры СММ и вернем логарифм вероятности
 		p = calcBaumWelсh(n);
+		// если данная оценка дала результат лучше - сохраним её
 		if(p>p0)
 		{
 			// TODO: load pi,a,tau,mu,sig from gpu and save here
@@ -246,49 +248,12 @@ void HMM::classifyObservations(real_t * p)
 			p[k]-=log(c(t,k));
 }
 
-/*real_t HMM::g(cl_int t,cl_int k,cl_int i,cl_int m,cl_int n)
-{
-	//работаем с диагональными ковариационными матрицами
-	real_t det=1.,res=0.;
-	real_t tmp1,tmp2;
-	if (n==-1) //работа с уже полученными параметрами модели 
-	{
-		for (cl_int z=0;z<Z;z++)
-		{
-			tmp1=SIG(z,z,i,m);
-			det*=tmp1;
-			tmp2=Otr(k,t,z)-MU(z,i,m);
-			res+=tmp2*tmp2/tmp1;
-		}		
-	}
-	else
-	{
-		for (cl_int z=0;z<Z;z++)
-		{
-			tmp1=SIG1(z,z,i,m,n);
-			det*=tmp1;
-			tmp2=Otr(k,t,z)-MU1(z,i,m,n);
-			res+=tmp2*tmp2/tmp1;
-		}
-	}
-	res*=-0.5;
-	res= (real_t) exp(res)/sqrt((real_t)pow(2.*pi,Z)*det);
-	return res;
-
-}*/
-
 real_t HMM::calcBaumWelсh(cl_int n)
 {
 	cl_int err;
 	cl_int T1=T-1;
 	cl::Event last_event;
-	std::fstream f; // debug
-
-	/*real_t * gam_sum = new real_t[N];
-	real_t * gamd_sum = new real_t[N*M];
-	real_t * tmp3 = new real_t[Z];
-	real_t tmp2;*/
-	//vector<double> tmp3(Z);
+	//std::fstream f; // debug
 
 	for(cl_int iter=0;iter<5;iter++)
 	{
@@ -318,12 +283,10 @@ real_t HMM::calcBaumWelсh(cl_int n)
 		kernel2->setArg(4,K); kernel2->setArg(5,*gam_sum_b);
 		kernel2->setArg(6,*gamd_sum_b); kernel2->setArg(7,*gamd_b);
 		kernel2->setArg(8,*flag_b);
-		cl_int flag = 0;
-		/// FLAG = 0 -> to GPU
-		//err = queue->enqueueWriteBuffer(*flag_b, CL_TRUE, 0, 1*sizeof(cl_int), &flag);
+
 		checkErr(err, "enqueueWriteBuffer() - flag_b");
-		for(cl_int t=0; t<T1 && flag == 0; t++)
-			for(cl_int k=0; k<K && flag == 0; k++)
+		for(cl_int t=0; t<T1; t++)
+			for(cl_int k=0; k<K; k++)
 			{
 				// кернел 3.2.1
 				kernel1->setArg(0,t); 
@@ -335,9 +298,6 @@ real_t HMM::calcBaumWelсh(cl_int n)
 				kernel2->setArg(1,k);
 				err = queue->enqueueNDRangeKernel(*kernel2, cl::NullRange, cl::NDRange(N, M), cl::NullRange);
 				checkErr(err, "k_3_2_2");
-				// LOAD F from GPU here
-				//err = queue->enqueueReadBuffer(*flag_b, CL_TRUE, 0, 1*sizeof(cl_int), &flag);	
-				//checkErr(err, "enqueueReadBuffer() - flag_b");
 			}
 
 		// DEBUG - gam_sum, gamd_sum - no error
@@ -357,10 +317,6 @@ real_t HMM::calcBaumWelсh(cl_int n)
 			f << gamd_sum_dbg[i] << std::endl;
 		f.close();*/
 		// /DEBUG
-
-		// check F
-		//if(flag < 0) 
-			//break;
 		
 		// кернел 3.3
 		kernel = kernels["k_3_3"];
@@ -392,8 +348,8 @@ real_t HMM::calcBaumWelсh(cl_int n)
 		checkErr(err, "enqueueReadBuffer() - A_b");
 		f.open("debugging_A.txt",std::fstream::out);
 		for (cl_int i=0; i<N*N; i++)
-		f << A_dbg[i] << std::endl;*/
-		f.close();
+		f << A_dbg[i] << std::endl;
+		f.close();*/
 		// DEBUG
 
 		// кернел 3.5
