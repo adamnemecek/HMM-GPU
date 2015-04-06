@@ -1,5 +1,5 @@
 #include <utility>
-#define __NO_STD_VECTOR		// Use cl::vector instead of STL version
+
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -25,13 +25,14 @@ void classClassify(real_t * p1, real_t * p2, real_t &percent1, real_t &percent2,
 }
 
 
-
+//k
 // инциализируем OpenCL
 bool initializeOpenCL(cl::Context *& context, std::map<std::string, cl::Kernel*> & kernels, cl::CommandQueue *& queue)
 {
 	// инициализация платформы
 	cl_int err;										// переменная с кодом ошибки
-	cl::vector< cl::Platform > platformList;		// список платформ			
+	std::vector< cl::Platform > platformList;		// список платформ			
+	//cl::Platform::get()
 	cl::Platform::get(&platformList);				//получим список доступных платформ
 	checkErr(platformList.size() != 0 ? CL_SUCCESS : -1, "cl::Platform::get");
 	std::cout << "Number of platforms: " << platformList.size() << std::endl;
@@ -45,7 +46,7 @@ bool initializeOpenCL(cl::Context *& context, std::map<std::string, cl::Kernel*>
 	checkErr(err, "Context::Context()");
 
 	// получение устройств для контекста
-	cl::vector<cl::Device> devices = context->getInfo<CL_CONTEXT_DEVICES>();			// получение списка устройств для контеста
+	std::vector<cl::Device> devices = context->getInfo<CL_CONTEXT_DEVICES>();			// получение списка устройств для контеста
 	checkErr(devices.size() > 0 ? CL_SUCCESS : -1, "devices.size() > 0");
 
 	std::string deviceName;

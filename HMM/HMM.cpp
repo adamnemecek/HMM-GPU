@@ -23,15 +23,15 @@ HMM::HMM(std::string filename)
 	TAU = new real_t[N*M];			
 	MU = new real_t[N*M*Z];
 	SIG = new real_t[N*M*Z*Z];
-	alf = new real_t[T*N*K];
-	bet = new real_t[T*N*K];
+	//alf = new real_t[T*N*K];
+	//bet = new real_t[T*N*K];
 	c = new real_t[T*K];				// коэффициенты масштаба
-	ksi = new real_t[(T-1)*N*N*K];	
+	//ksi = new real_t[(T-1)*N*N*K];	
 	gam = new real_t[T*N*K];
 	gamd = new real_t[T*N*M*K];
-	alf_t = new real_t[T*N*K];
-	bet_t = new real_t[T*N*K];
-	B = new real_t[N*T*K];			// вероятности появления наблюдений
+	//alf_t = new real_t[T*N*K];
+	//bet_t = new real_t[T*N*K];
+	//B = new real_t[N*T*K];			// вероятности появления наблюдений
 
 	//начальные приближения
 	A1 = new real_t[N*N];
@@ -253,15 +253,19 @@ real_t HMM::calcBaumWelсh(cl_int n)
 	cl_int err;
 	cl_int T1=T-1;
 	cl::Event last_event;
+	real_t * gam_sum = new real_t[N];
+	real_t * gamd_sum = new real_t[N*M];
 	//std::fstream f; // debug
 
-	for(cl_int iter=0;iter<5;iter++)
+	for(cl_int iter=0; iter<5; iter++)
 	{
 		// большой блок вспомогательных вычислений
 		internal_calculations(n);
 
+		cl::Kernel * kernel;
+
 		// кернел 3.1.1
-		cl::Kernel * kernel = kernels["k_3_1_1"];
+		/*cl::Kernel * kernel = kernels["k_3_1_1"];
 		kernel->setArg(0,*gam_sum_b); 
 		err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N), cl::NullRange);
 		checkErr(err, "k_3_1_1");
@@ -270,11 +274,11 @@ real_t HMM::calcBaumWelсh(cl_int n)
 		kernel = kernels["k_3_1_2"];
 		kernel->setArg(0,M); kernel->setArg(1,*gamd_sum_b);
 		err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N, M), cl::NullRange);
-		checkErr(err, "k_3_1_2");
+		checkErr(err, "k_3_1_2");*/
 		
 		
 		// кернел 3.2 (БОЛЬШОЙ)
-		cl::Kernel * kernel1 = kernels["k_3_2_1"];
+		/*cl::Kernel * kernel1 = kernels["k_3_2_1"];
 		kernel1->setArg(2,N); kernel1->setArg(3,K);
 		kernel1->setArg(4,*gam_sum_b); kernel1->setArg(5,*gam_b);
 		kernel1->setArg(6,*flag_b);
@@ -284,8 +288,36 @@ real_t HMM::calcBaumWelсh(cl_int n)
 		kernel2->setArg(6,*gamd_sum_b); kernel2->setArg(7,*gamd_b);
 		kernel2->setArg(8,*flag_b);
 
-		checkErr(err, "enqueueWriteBuffer() - flag_b");
-		for(cl_int t=0; t<T1; t++)
+		checkErr(err, "enqueueWriteBuffer() - flag_b");*/
+
+		
+		// bottleneck
+		for (cl_int i = 0; i < N; i++)
+		{
+			gam_sum[i] = 0;
+			for (cl_int m = 0; m < M; m++)
+			{
+				gamd_sum[i*M + m] = 0;
+			}
+		}
+		err = queue->enqueueReadBuffer(*gam_b, CL_TRUE, 0, T*N*K*sizeof(real_t), gam);
+		err = queue->enqueueReadBuffer(*gamd_b, CL_TRUE, 0, T*N*M*K*sizeof(real_t), gamd);
+		for (cl_int t = 0; t<T1; t++)
+			for (cl_int k = 0; k < K; k++)
+				for (cl_int i = 0; i < N; i++)
+				{
+					gam_sum[i] += gam(t, i, k);
+					for (cl_int m = 0; m < M; m++)
+					{
+						real_t ttt = gamd_sum[i*M + m] + gamd(t, i, m, k);
+						if (isfinite(ttt))
+							gamd_sum[i*M + m] += gamd(t, i, m, k);
+					}
+				}
+		err = queue->enqueueWriteBuffer(*gam_sum_b, CL_TRUE, 0, N*sizeof(real_t), gam_sum);
+		err = queue->enqueueWriteBuffer(*gamd_sum_b, CL_TRUE, 0, N*M*sizeof(real_t), gamd_sum);
+
+		/*for(cl_int t=0; t<T1; t++)
 			for(cl_int k=0; k<K; k++)
 			{
 				// кернел 3.2.1
@@ -299,6 +331,7 @@ real_t HMM::calcBaumWelсh(cl_int n)
 				err = queue->enqueueNDRangeKernel(*kernel2, cl::NullRange, cl::NDRange(N, M), cl::NullRange);
 				checkErr(err, "k_3_2_2");
 			}
+			*/
 
 		// DEBUG - gam_sum, gamd_sum - no error
 		/*std::fstream f;
@@ -447,6 +480,9 @@ real_t HMM::calcBaumWelсh(cl_int n)
 		f.close();*/
 		// DEBUG
 	}
+
+	delete gam_sum;
+	delete gamd_sum;
 	
 	// load c here from GPU
 	err = last_event.wait();

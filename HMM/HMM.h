@@ -1,9 +1,12 @@
 #pragma once
 #include <utility>
-#define __NO_STD_VECTOR // Use cl::vector instead of STL version
+//#define __NO_STD_VECTOR // Use std::vector instead of STL version
+//#define CL_USE_DEPRECATED_OPENCL_1_1_APIS
+#define CL_USE_DEPRECATED_OPENCL_2_0_APIS// before
 #include <CL/cl.hpp>
 #include <iostream>
 #include <map>
+#include <vector>
 
 //#define CONFIG_USE_DOUBLE             // использовать ли двойную точность
 
@@ -13,16 +16,16 @@ typedef cl_double real_t;
 typedef cl_float real_t;
 #endif
 
-#define A(i,j) A[i*N+j]
-#define A1(i,j) A1[i*N+j]
-#define A_used(i,j) A_used[i*N+j]
-#define TAU(i,m) TAU[i*M+m]
-#define TAU1(i,m) TAU1[i*M+m]
-#define TAU_used(i,m) TAU_used[i*M+m]
+#define A(i,j) A[(i)*N+j]
+#define A1(i,j) A1[(i)*N+j]
+#define A_used(i,j) A_used[(i)*N+j]
+#define TAU(i,m) TAU[(i)*M+m]
+#define TAU1(i,m) TAU1[(i)*M+m]
+#define TAU_used(i,m) TAU_used[(i)*M+m]
 #define MU(z,i,m) MU[((i)*M+m)*Z+z]
 //#define MU(z,i,m,n) MU[(((n)*N+i)*M+m)*Z+z]
-#define SIG(z1,z2,i,m) SIG[ ((i*M+m)*Z+z1)*Z+ z2]
-#define Otr(k,t,z) Otr[(k*T+t)*Z+z]
+#define SIG(z1,z2,i,m) SIG[ (((i)*M+m)*Z+z1)*Z+ z2]
+#define Otr(k,t,z) Otr[((k)*T+t)*Z+z]
 #define MU1(z,i,m,n) MU1[(((n)*N+i)*M+m)*Z+z]
 #define SIG1(z1,z2,i,m,n) SIG1[((((n)*N+i)*M+m)*Z+z1)*Z+z2]
 #define B(i,t,k) B[((i)*T+t)*K+k]
@@ -48,7 +51,7 @@ public:
 	cl_int Z;	// размерность наблюдений
 	real_t *PI,*A,*TAU,*MU,*SIG,*MU1,*SIG1,*Otr,*A1,*PI1,*TAU1;
 	cl::Buffer *PI_b,*A_b,*TAU_b,*MU_b,*SIG_b,*MU1_b,*SIG1_b,*Otr_b,*A1_b,*PI1_b,*TAU1_b;
-	real_t *alf,*bet,*c,*ksi,*gam,*gamd,*alf_t,*bet_t,*B;
+	real_t /**alf,*bet,*/*c,/**ksi,*/*gam,*gamd/*,*alf_t,*bet_t,*B*/;
 	cl::Buffer *alf_b,*bet_b,*c_b,*ksi_b,*gam_b,*gamd_b,*alf_t_b,*bet_t_b,*B_b;
 	cl::Buffer * gam_sum_b, * gamd_sum_b;
 	cl::Buffer * flag_b;

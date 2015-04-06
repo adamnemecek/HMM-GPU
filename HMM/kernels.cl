@@ -31,15 +31,15 @@
 	#define pi 3.14159265359f
 #endif
 
-#define A(i,j) A[i*N+j]
-#define A1(i,j) A1[i*N+j]
-#define A_used(i,j) A_used[i*N+j]
-#define TAU(i,m) TAU[i*M+m]
-#define TAU1(i,m) TAU1[i*M+m]
-#define TAU_used(i,m) TAU_used[i*M+m]
+#define A(i,j) A[(i)*N+j]
+#define A1(i,j) A1[(i)*N+j]
+#define A_used(i,j) A_used[(i)*N+j]
+#define TAU(i,m) TAU[(i)*M+m]
+#define TAU1(i,m) TAU1[(i)*M+m]
+#define TAU_used(i,m) TAU_used[(i)*M+m]
 #define MU(z,i,m) MU[((i)*M+m)*Z+z]
-#define SIG(z1,z2,i,m) SIG[ ((i*M+m)*Z+z1)*Z+ z2]
-#define Otr(k,t,z) Otr[(k*T+t)*Z+z]
+#define SIG(z1,z2,i,m) SIG[ (((i)*M+m)*Z+z1)*Z+ z2]
+#define Otr(k,t,z) Otr[((k)*T+t)*Z+z]
 #define MU1(z,i,m,n) MU1[(((n)*N+i)*M+m)*Z+z]
 #define SIG1(z1,z2,i,m,n) SIG1[((((n)*N+i)*M+m)*Z+z1)*Z+z2]
 #define B(i,t,k) B[((i)*T+t)*K+k]
