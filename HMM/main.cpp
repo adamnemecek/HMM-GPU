@@ -39,8 +39,9 @@ bool initializeOpenCL(cl::Context *& context, std::map<std::string, cl::Kernel*>
 
 
 	// создание контекста
+	// ВНИМАНИЕ! УСТРОЙСТВО, НА КОТОРОМ БУДУТ ПРОВОДИТЬСЯ ВЫЧИСЛЕНИЕ ЗАДАЕТСЯ В platformList[НОМЕР_УСТРОЙСТВА] !!!!
 	cl_context_properties cprops[3] =
-	{ CL_CONTEXT_PLATFORM, (cl_context_properties)(platformList[0])(), 0 };		// зададим свойства для первой платформы
+	{ CL_CONTEXT_PLATFORM, (cl_context_properties)(platformList[1])(), 0 };		// зададим свойства для ВЫБРАННОЙ платформы
 	//context = new cl::Context(CL_DEVICE_TYPE_GPU, cprops, NULL, NULL, &err);		// создадим контекст устройства с заданными свойствами
 	context = new cl::Context(CL_DEVICE_TYPE_GPU, cprops, NULL, NULL, &err);
 	checkErr(err, "Context::Context()");

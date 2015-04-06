@@ -231,7 +231,7 @@ void HMM::classifyObservations(real_t * p)
 {
 	// внутренние вычисления
 	internal_calculations(-1);
-
+	//printf("point-1\n");
 	// get c from GPU
 	cl_int err = queue->enqueueReadBuffer(*c_b, CL_TRUE, 0, T*K*sizeof(real_t), c);	
 	checkErr(err, "enqueueReadBuffer() - c_b");
@@ -402,7 +402,28 @@ real_t HMM::calcBaumWelсh(cl_int n)
 		f.close();*/
 		// DEBUG
 		
-		// кернел 3.6
+		// кернел 3.6 - bottleneck
+		/*real_t ttt;
+		for (int z = 0; z < Z; z++)
+		{
+			for (int i = 0; i < N; i++)
+			{
+				for (int m = 0; m < M; m++)
+				{
+					MU(z, i, m) = 0.0f;
+					for (int k = 0; k < K; k++)									// 2d-редукция
+						for (int t = 0; t < T; t++)
+						{
+							ttt = MU(z, i, m) + gamd(t, i, m, k)*Otr(k, t, z);
+							if (isfinite(ttt))
+								MU(z, i, m) += gamd(t, i, m, k)*Otr(k, t, z);
+						}
+					MU(z, i, m) /= gamd_sum[i*M + m];
+				}
+			}
+		}
+		err = queue->enqueueWriteBuffer(*MU_b, CL_TRUE, 0, Z*N*M*sizeof(real_t), MU);*/
+
 		kernel = kernels["k_3_6"];
 		kernel->setArg(0,N); kernel->setArg(1,M); kernel->setArg(2,K);
 		kernel->setArg(3,Z); kernel->setArg(4,T); 
@@ -421,7 +442,30 @@ real_t HMM::calcBaumWelсh(cl_int n)
 		f.close();*/
 		// DEBUG
 
-		// кернел 3.7
+		// кернел 3.7 - bottleneck
+		/*real_t tmp3;
+		for (cl_int z1 = 0; z1<Z; z1++)
+			for (cl_int z2 = 0; z2 < Z; z2++)
+			{
+				for (cl_int i = 0; i < N; i++)
+				{
+					for (cl_int m = 0; m < M; m++)
+					{
+						SIG(z1, z2, i, m) = 0.0f;
+						for (cl_int k = 0; k < K; k++)										// 2d-редукция
+							for (cl_int t = 0; t < T; t++)
+							{
+								tmp3 = (Otr(k, t, z1) - MU(z1, i, m)) * (Otr(k, t, z2) - MU(z2, i, m));
+								ttt = SIG(z1, z2, i, m) + gamd(t, i, m, k)*tmp3;
+								if (isfinite(ttt))
+									SIG(z1, z2, i, m) += gamd(t, i, m, k)*tmp3;
+							}
+						SIG(z1, z2, i, m) /= gamd_sum[i*M + m];
+					}
+				}
+			}
+		err = queue->enqueueWriteBuffer(*SIG_b, CL_TRUE, 0, Z*Z*N*M*sizeof(real_t), SIG);*/
+
 		kernel = kernels["k_3_7"];
 		kernel->setArg(0,N); kernel->setArg(1,M); kernel->setArg(2,Z);
 		kernel->setArg(3,K); kernel->setArg(4,T);
@@ -641,101 +685,110 @@ void HMM::internal_calculations(cl_int n)
 	f.close();*/
 	// /DEBUG
 
-	// кернел 2.5 (большой)
-	kernel1 = kernels["k_2_5_1"];
-	kernel1->setArg(1,N);
-	kernel1->setArg(2,K); kernel1->setArg(3,*bet_t_b);
-	kernel1->setArg(4,*c_b); kernel1->setArg(5,*bet_b);
-	kernel2 = kernels["k_2_5_2"];
-	kernel2->setArg(1,N); kernel2->setArg(2,K);
-	kernel2->setArg(3,T); kernel2->setArg(4,*bet_b);
-	kernel2->setArg(5,*A_used_b); kernel2->setArg(6,*B_b);
-	kernel2->setArg(7,*bet_t_b); kernel2->setArg(8,*alf_b);
-	for(cl_int t=T1-1;t>=0;t--)
+	///
+	/// далее вычисления только для этапа обучения
+	///
+	if (n != -1) 
 	{
-		// кернел 2.5.1
-		kernel1->setArg(0,t);
-		err = queue->enqueueNDRangeKernel(*kernel1, cl::NullRange, cl::NDRange(N, K), cl::NullRange);
-		checkErr(err, "k_2_5_1");
-		// кернел 2.5.2
-		kernel2->setArg(0,t);	
-		err = queue->enqueueNDRangeKernel(*kernel2, cl::NullRange, cl::NDRange(N, K), cl::NullRange);
-		checkErr(err, "k_2_5_2");
-	}
+		// кернел 2.5 (большой)
+		kernel1 = kernels["k_2_5_1"];
+		kernel1->setArg(1, N);
+		kernel1->setArg(2, K); kernel1->setArg(3, *bet_t_b);
+		kernel1->setArg(4, *c_b); kernel1->setArg(5, *bet_b);
+		kernel2 = kernels["k_2_5_2"];
+		kernel2->setArg(1, N); kernel2->setArg(2, K);
+		kernel2->setArg(3, T); kernel2->setArg(4, *bet_b);
+		kernel2->setArg(5, *A_used_b); kernel2->setArg(6, *B_b);
+		kernel2->setArg(7, *bet_t_b); kernel2->setArg(8, *alf_b);
+		for (cl_int t = T1 - 1; t >= 0; t--)
+		{
+			// кернел 2.5.1
+			kernel1->setArg(0, t);
+			err = queue->enqueueNDRangeKernel(*kernel1, cl::NullRange, cl::NDRange(N, K), cl::NullRange);
+			checkErr(err, "k_2_5_1");
+			// кернел 2.5.2
+			kernel2->setArg(0, t);
+			err = queue->enqueueNDRangeKernel(*kernel2, cl::NullRange, cl::NDRange(N, K), cl::NullRange);
+			checkErr(err, "k_2_5_2");
+		}
 
-	// DEBUG bet, bet_t - satisfying
-	/*std::fstream f;
-	real_t * bet_dbg = new real_t[N*T*K];
-	err = queue->enqueueReadBuffer(*bet_b, CL_TRUE, 0, N*T*K*sizeof(real_t), bet_dbg);
-	checkErr(err, "enqueueReadBuffer() - bet_b");
-	f.open("debugging_bet.txt",std::fstream::out);
-	for (cl_int i=0; i<N*T*K; i++)
+		// DEBUG bet, bet_t - satisfying
+		/*std::fstream f;
+		real_t * bet_dbg = new real_t[N*T*K];
+		err = queue->enqueueReadBuffer(*bet_b, CL_TRUE, 0, N*T*K*sizeof(real_t), bet_dbg);
+		checkErr(err, "enqueueReadBuffer() - bet_b");
+		f.open("debugging_bet.txt",std::fstream::out);
+		for (cl_int i=0; i<N*T*K; i++)
 		f << bet_dbg[i] << std::endl;
-	f.close();
-	real_t * bet_t_dbg = new real_t[N*T*K];
-	err = queue->enqueueReadBuffer(*bet_t_b, CL_TRUE, 0, N*T*K*sizeof(real_t), bet_t_dbg);
-	checkErr(err, "enqueueReadBuffer() - bet_t_b");
-	f.open("debugging_bet_t.txt", std::fstream::out);
-	for (cl_int i = 0; i<N*T*K; i++)
+		f.close();
+		real_t * bet_t_dbg = new real_t[N*T*K];
+		err = queue->enqueueReadBuffer(*bet_t_b, CL_TRUE, 0, N*T*K*sizeof(real_t), bet_t_dbg);
+		checkErr(err, "enqueueReadBuffer() - bet_t_b");
+		f.open("debugging_bet_t.txt", std::fstream::out);
+		for (cl_int i = 0; i<N*T*K; i++)
 		f << bet_t_dbg[i] << std::endl;
-	f.close();*/
-	// /DEBUG
+		f.close();*/
+		// /DEBUG
 
-	// кернел 2.6 
-	kernel = kernels["k_2_6"];
-	kernel->setArg(0,n); kernel->setArg(1,N);
-	kernel->setArg(2,M); kernel->setArg(3,K);
-	kernel->setArg(4,Z); kernel->setArg(5,T);
-	kernel->setArg(6,*gam_b); kernel->setArg(7,*alf_b);
-	kernel->setArg(8,*bet_b); kernel->setArg(9,*TAU_used_b);
-	kernel->setArg(10,*SIG_used_b); kernel->setArg(11,*Otr_b);
-	kernel->setArg(12,*MU_used_b); kernel->setArg(13,*gamd_b);
-	kernel->setArg(14,*g_b);
-	err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N, T, K), cl::NullRange);
-	checkErr(err, "k_2_6");
+		// кернел 2.6 
+		kernel = kernels["k_2_6"];
+		kernel->setArg(0, n); kernel->setArg(1, N);
+		kernel->setArg(2, M); kernel->setArg(3, K);
+		kernel->setArg(4, Z); kernel->setArg(5, T);
+		kernel->setArg(6, *gam_b); kernel->setArg(7, *alf_b);
+		kernel->setArg(8, *bet_b); kernel->setArg(9, *TAU_used_b);
+		kernel->setArg(10, *SIG_used_b); kernel->setArg(11, *Otr_b);
+		kernel->setArg(12, *MU_used_b); kernel->setArg(13, *gamd_b);
+		kernel->setArg(14, *g_b);
+		err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N, T, K), cl::NullRange);
+		checkErr(err, "k_2_6");
 
-	// DEBUG gam, gamd - satisfying
-	/*std::fstream f;
-	real_t * gam_dbg = new real_t[N*T*K];
-	err = queue->enqueueReadBuffer(*gam_b, CL_TRUE, 0, N*T*K*sizeof(real_t), gam_dbg);
-	checkErr(err, "enqueueReadBuffer() - gam_b");
-	f.open("debugging_gam.txt",std::fstream::out);
-	for (cl_int i=0; i<N*T*K; i++)
-	f << gam_dbg[i] << std::endl;
-	f.close();
-	real_t * gamd_dbg = new real_t[N*M*T*K];
-	err = queue->enqueueReadBuffer(*gamd_b, CL_TRUE, 0, N*M*T*K*sizeof(real_t), gamd_dbg);
-	checkErr(err, "enqueueReadBuffer() - gamd_b");
-	f.open("debugging_gamd.txt", std::fstream::out);
-	for (cl_int i = 0; i<N*M*T*K; i++)
-	f << gamd_dbg[i] << std::endl;
-	f.close();*/
-	// /DEBUG
+		// DEBUG gam, gamd - satisfying
+		/*std::fstream f;
+		real_t * gam_dbg = new real_t[N*T*K];
+		err = queue->enqueueReadBuffer(*gam_b, CL_TRUE, 0, N*T*K*sizeof(real_t), gam_dbg);
+		checkErr(err, "enqueueReadBuffer() - gam_b");
+		f.open("debugging_gam.txt",std::fstream::out);
+		for (cl_int i=0; i<N*T*K; i++)
+		f << gam_dbg[i] << std::endl;
+		f.close();
+		real_t * gamd_dbg = new real_t[N*M*T*K];
+		err = queue->enqueueReadBuffer(*gamd_b, CL_TRUE, 0, N*M*T*K*sizeof(real_t), gamd_dbg);
+		checkErr(err, "enqueueReadBuffer() - gamd_b");
+		f.open("debugging_gamd.txt", std::fstream::out);
+		for (cl_int i = 0; i<N*M*T*K; i++)
+		f << gamd_dbg[i] << std::endl;
+		f.close();*/
+		// /DEBUG
 
-	// кернел 2.7 (set_var)
-	kernel = kernels["k_2_7"];
-	kernel->setArg(0,N); kernel->setArg(1,K);
-	kernel->setArg(2,T); kernel->setArg(3,*ksi_b);
-	kernel->setArg(4,*alf_b); kernel->setArg(5,*A_used_b);
-	kernel->setArg(6,*B_b); kernel->setArg(7,*bet_b);
-	err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N*N, T1, K), cl::NullRange);
-	checkErr(err, "k_2_7");
+		// кернел 2.7 (set_var)
+		kernel = kernels["k_2_7"];
+		kernel->setArg(0, N); kernel->setArg(1, K);
+		kernel->setArg(2, T); kernel->setArg(3, *ksi_b);
+		kernel->setArg(4, *alf_b); kernel->setArg(5, *A_used_b);
+		kernel->setArg(6, *B_b); kernel->setArg(7, *bet_b);
+		err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N*N, T1, K), cl::NullRange);
+		checkErr(err, "k_2_7");
 
-	// DEBUG ksi - satisfying
-	/*std::fstream f;
-	real_t * ksi_dbg = new real_t[N*N*T1*K];
-	err = queue->enqueueReadBuffer(*ksi_b, CL_TRUE, 0, N*N*T1*K*sizeof(real_t), ksi_dbg);
-	checkErr(err, "enqueueReadBuffer() - ksi_b");
-	f.open("debugging_ksi.txt",std::fstream::out);
-	for (cl_int i=0; i<N*N*T1*K; i++)
-	f << ksi_dbg[i] << std::endl;
-	f.close();*/
-	// /DEBUG
+		// DEBUG ksi - satisfying
+		/*std::fstream f;
+		real_t * ksi_dbg = new real_t[N*N*T1*K];
+		err = queue->enqueueReadBuffer(*ksi_b, CL_TRUE, 0, N*N*T1*K*sizeof(real_t), ksi_dbg);
+		checkErr(err, "enqueueReadBuffer() - ksi_b");
+		f.open("debugging_ksi.txt",std::fstream::out);
+		for (cl_int i=0; i<N*N*T1*K; i++)
+		f << ksi_dbg[i] << std::endl;
+		f.close();*/
+		// /DEBUG
+	}
 }
 
 real_t HMM::calcProbability()
 {
+	//printf("point-1\n");
 	// TODO: загрузка массива c from GPU
+	//queue->flush();
+	//queue->finish();
 	cl_int err = queue->enqueueReadBuffer(*c_b, CL_TRUE, 0, T*K*sizeof(real_t), c);	
 	checkErr(err, "enqueueReadBuffer() - c_b");
 	real_t res=0;
