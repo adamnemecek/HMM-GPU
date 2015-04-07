@@ -26,7 +26,7 @@ HMM::HMM(std::string filename)
 	//alf = new real_t[T*N*K];
 	//bet = new real_t[T*N*K];
 	c = new real_t[T*K];				// коэффициенты масштаба
-	//ksi = new real_t[(T-1)*N*N*K];	
+	ksi = new real_t[(T-1)*N*N*K];	
 	gam = new real_t[T*N*K];
 	gamd = new real_t[T*N*M*K];
 	//alf_t = new real_t[T*N*K];
@@ -255,9 +255,13 @@ real_t HMM::calcBaumWelсh(cl_int n)
 	cl::Event last_event;
 	real_t * gam_sum = new real_t[N];
 	real_t * gamd_sum = new real_t[N*M];
+	// для выхода по вероятности
+	double p = 100000000000000000; double p_pred = 1000000000000000000;
+	double e = 0.001;
 	//std::fstream f; // debug
 
-	for(cl_int iter=0; iter<5; iter++)
+	// TODO: выход по невязке (по вероятности)
+	for(cl_int iter=0; iter<MAX_ITER/*, abs(p-p_pred) > e*/; iter++)
 	{
 		// большой блок вспомогательных вычислений
 		internal_calculations(n);
@@ -367,13 +371,27 @@ real_t HMM::calcBaumWelсh(cl_int n)
 		f.close();*/
 		// DEBUG
 		
-		// кернел 3.4
-		kernel = kernels["k_3_4"];
+		// кернел 3.4 - bottleneck
+
+		err = queue->enqueueReadBuffer(*ksi_b, CL_TRUE, 0, (T-1)*N*N*K*sizeof(real_t), ksi);
+		err = queue->enqueueReadBuffer(*c_b, CL_TRUE, 0, T*K*sizeof(real_t), c);
+		for (int i = 0; i < N; i++)
+			for (int j = 0; j < N; j++)
+			{
+				real_t tmp2 = 0.0f;
+				for (int k = 0; k < K; k++)							// 2d-редукция
+					for (int t = 0; t < T1; t++)
+						tmp2 += ksi(t, i, j, k)*c(t + 1, k);
+				A(i, j) = tmp2 / gam_sum[i];
+			}
+		err = queue->enqueueWriteBuffer(*A_b, CL_TRUE, 0, N*N*sizeof(real_t), A);
+
+		/*kernel = kernels["k_3_4"];
 		kernel->setArg(0,K); kernel->setArg(1,N); kernel->setArg(2,T1);
 		kernel->setArg(3,*A_b); kernel->setArg(4,*ksi_b);
 		kernel->setArg(5,*gam_sum_b); kernel->setArg(6,*c_b);
 		err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N, N), cl::NullRange);
-		checkErr(err, "k_3_4");
+		checkErr(err, "k_3_4");*/
 
 		// DEBUG - A - good
 		/*real_t * A_dbg = new real_t[N*N];
@@ -523,6 +541,9 @@ real_t HMM::calcBaumWelсh(cl_int n)
 			f << SIG1_dbg[i] << std::endl;
 		f.close();*/
 		// DEBUG
+		// посчитаем новый логарифм вероятности
+		p = calcProbability();
+		std::swap(p, p_pred);
 	}
 
 	delete gam_sum;
@@ -789,8 +810,8 @@ real_t HMM::calcProbability()
 	// TODO: загрузка массива c from GPU
 	//queue->flush();
 	//queue->finish();
-	cl_int err = queue->enqueueReadBuffer(*c_b, CL_TRUE, 0, T*K*sizeof(real_t), c);	
-	checkErr(err, "enqueueReadBuffer() - c_b");
+	//cl_int err = queue->enqueueReadBuffer(*c_b, CL_TRUE, 0, T*K*sizeof(real_t), c);	
+	//checkErr(err, "enqueueReadBuffer() - c_b");
 	real_t res=0;
 	for(cl_int k=0;k<K;k++)
 		for(cl_int t=0;t<T;t++)

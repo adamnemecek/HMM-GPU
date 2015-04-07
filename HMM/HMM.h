@@ -8,6 +8,7 @@
 #include <map>
 #include <vector>
 
+#define MAX_ITER 5	// максимальное число итераций в алгоритме Ѕаума-¬елша
 //#define CONFIG_USE_DOUBLE             // использовать ли двойную точность
 
 #if defined(CONFIG_USE_DOUBLE)
@@ -51,7 +52,7 @@ public:
 	cl_int Z;	// размерность наблюдений
 	real_t *PI,*A,*TAU,*MU,*SIG,*MU1,*SIG1,*Otr,*A1,*PI1,*TAU1;
 	cl::Buffer *PI_b,*A_b,*TAU_b,*MU_b,*SIG_b,*MU1_b,*SIG1_b,*Otr_b,*A1_b,*PI1_b,*TAU1_b;
-	real_t /**alf,*bet,*/*c,/**ksi,*/*gam,*gamd/*,*alf_t,*bet_t,*B*/;
+	real_t /**alf,*bet,*/*c,*ksi,*gam,*gamd/*,*alf_t,*bet_t,*B*/;
 	cl::Buffer *alf_b,*bet_b,*c_b,*ksi_b,*gam_b,*gamd_b,*alf_t_b,*bet_t_b,*B_b;
 	cl::Buffer * gam_sum_b, * gamd_sum_b;
 	cl::Buffer * flag_b;
@@ -61,7 +62,7 @@ private:
 	std::map<std::string,cl::Kernel*> kernels;		// массив кернелов
 	cl::CommandQueue * queue;						// командна€ очередь
 public:
-	HMM(std::string filenamMe);					// загрузка параметров модели из файла
+	HMM(std::string filename);					// загрузка параметров модели из файла
 	~HMM(void);
 	void findModelParameters();					// нахождение параметров модели
 	void getTestObserv(std::string filename);	// считывание тестовых последовательностей дл€ классификации
