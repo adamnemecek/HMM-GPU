@@ -2,7 +2,7 @@
 #include <utility>
 //#define __NO_STD_VECTOR // Use std::vector instead of STL version
 //#define CL_USE_DEPRECATED_OPENCL_1_1_APIS
-#define CL_USE_DEPRECATED_OPENCL_2_0_APIS// before
+#define CL_USE_DEPRECATED_OPENCL_2_0_APIS
 #include <CL/cl.hpp>
 #include <iostream>
 #include <map>

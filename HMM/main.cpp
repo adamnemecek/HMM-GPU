@@ -37,13 +37,31 @@ bool initializeOpenCL(cl::Context *& context, std::map<std::string, cl::Kernel*>
 	checkErr(platformList.size() != 0 ? CL_SUCCESS : -1, "cl::Platform::get");
 	std::cout << "Number of platforms: " << platformList.size() << std::endl;
 
+	// выведем все платформы и устройства
+	for (int i = 0; i < platformList.size(); i++)
+	{
+		std::cout << "Platform " << std::to_string(i) << std::endl;
+		cl_context_properties cprops[3] =
+			{ CL_CONTEXT_PLATFORM, (cl_context_properties)(platformList[i])(), 0 };
+		context = new cl::Context(CL_DEVICE_TYPE_ALL, cprops, NULL, NULL, &err);	
+		std::vector<cl::Device> devices = context->getInfo<CL_CONTEXT_DEVICES>();
+		for (int j = 0; j < devices.size(); j++)
+		{
+			std::string deviceName;
+			devices[j].getInfo(CL_DEVICE_NAME, &deviceName);
+			std::cout << deviceName << std::endl;
+		}
+		delete context;
+		std::cout << std::endl;
+	}
+	//std::cout << std::endl;
 
 	// создание контекста
 	// ВНИМАНИЕ! УСТРОЙСТВО, НА КОТОРОМ БУДУТ ПРОВОДИТЬСЯ ВЫЧИСЛЕНИЕ ЗАДАЕТСЯ В platformList[НОМЕР_УСТРОЙСТВА] !!!!
 	cl_context_properties cprops[3] =
-	{ CL_CONTEXT_PLATFORM, (cl_context_properties)(platformList[1])(), 0 };		// зададим свойства для ВЫБРАННОЙ платформы
+	{ CL_CONTEXT_PLATFORM, (cl_context_properties)(platformList[0])(), 0 };		// зададим свойства для ВЫБРАННОЙ платформы
 	//context = new cl::Context(CL_DEVICE_TYPE_GPU, cprops, NULL, NULL, &err);		// создадим контекст устройства с заданными свойствами
-	context = new cl::Context(CL_DEVICE_TYPE_GPU, cprops, NULL, NULL, &err);
+	context = new cl::Context(CL_DEVICE_TYPE_ALL, cprops, NULL, NULL, &err);
 	checkErr(err, "Context::Context()");
 
 	// получение устройств для контекста
@@ -53,6 +71,7 @@ bool initializeOpenCL(cl::Context *& context, std::map<std::string, cl::Kernel*>
 	std::string deviceName;
 	devices[0].getInfo(CL_DEVICE_NAME, &deviceName);
 	std::cout << "Number of devices: " << devices.size() << std::endl;
+	
 	std::cout << "Current device: " << deviceName << std::endl;
 
 	// загрузка исходного кода кернела и компиляция

@@ -296,6 +296,7 @@ real_t HMM::calcBaumWelñh(cl_int n)
 
 		
 		// bottleneck
+		//#pragma omp parallel for schedule(dynamic, 1)
 		for (cl_int i = 0; i < N; i++)
 		{
 			gam_sum[i] = 0;
@@ -304,8 +305,10 @@ real_t HMM::calcBaumWelñh(cl_int n)
 				gamd_sum[i*M + m] = 0;
 			}
 		}
+
 		err = queue->enqueueReadBuffer(*gam_b, CL_TRUE, 0, T*N*K*sizeof(real_t), gam);
 		err = queue->enqueueReadBuffer(*gamd_b, CL_TRUE, 0, T*N*M*K*sizeof(real_t), gamd);
+		//#pragma omp parallel for schedule(dynamic, 1) 
 		for (cl_int t = 0; t<T1; t++)
 			for (cl_int k = 0; k < K; k++)
 				for (cl_int i = 0; i < N; i++)
