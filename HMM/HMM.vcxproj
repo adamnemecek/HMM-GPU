@@ -166,9 +166,11 @@
   <ItemGroup>
     <ClCompile Include="HMM.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="svm.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="HMM.h" />
+    <ClInclude Include="svm.h" />
   </ItemGroup>
   <ItemGroup>
     <Intel_OpenCL_Build_Rules Include="kernels.cl" />

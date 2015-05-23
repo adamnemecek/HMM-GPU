@@ -462,3 +462,270 @@ __kernel void k_3_12(int N, int M, int Z, int n, __global real_t * SIG1, __globa
 	size_t z1 = z / Z, z2 = z % Z;
 	SIG1(z1,z2,i,m,n) = SIG(z1,z2,i,m);	
 }
+
+
+
+#define d_A(k,i,j) d_A[((k)*N+i)*N+j]
+#define d_TAU(k,i,m) d_TAU[((k)*N+i)*M+m]
+#define d_MU(k,z,i,m) d_MU[(((k)*N+i)*M+m)*Z+z]
+#define d_SIG(k,z,i,m) d_SIG[(((k)*N+i)*M+m)*Z+z]
+#define dets(k,i,m) dets[((k)*N+i)*M+m]
+#define a_A(k,i,j,i1,j1) a_A[((((k)*N+i)*N+j)*N+i1)*N+j1]
+#define b_MUSIG(k,i,m,z,i1,t) b_MUSIG[(((((k)*N+i)*M+m)*Z+z)*N+i1)*T+t]
+#define b_TAU(k, i, m, i1, t) b_TAU[((((k)*N+i)*M+m)*N+i1)*T+t]
+#define alf1_PI(k,i,j) alf1_PI[((k)*N+i)*N+j]
+#define alf1_MUSIG(k, i, m, z, i1) alf1_MUSIG[((((k)*N+i)*M+m)*Z+z)*N+i1]
+#define alf1_TAU(k, i, m, i1) alf1_TAU[(((k)*N+i)*M+m)*N+i1]
+
+//#define cd(k,t) cd[(k)*T+t]
+//#define alf_t_d(k, t, i) alf_t_d[((k)*T+t)*N+i]
+//#define alf_s_d(k, t, i) alf_s_d[((k)*T+t)*N+i]
+
+#define cd(k,i,j,m,z, t) cd[(((((k)*N+i)*N+j)*M+m)*Z+z)*T+t]
+#define alf_t_d(k,i1,j,m,z, t,i) alf_t_d[(((((k)*N+i1)*N+j)*M+m)*Z+z)*N+i]
+#define alf_s_d(k,i1,j,m,z, t,i) alf_s_d[(((((k)*N+i1)*N+j)*M+m)*Z+z)*N+i]
+
+real_t calc_alpha_der(int k, int i1, int j1, int m1, int z1,
+		int N, int M, int Z, int T, int K, 
+		__global real_t * alf1_N, __global real_t * a_N, __global real_t * b_N, 
+		__global real_t * cd, __global real_t * alf_t_d, __global real_t * alf_s_d,
+		__global real_t * c, __global real_t * alf, __global real_t * alf_t, 
+		__global real_t * A, __global real_t * B)
+{
+	int i, j, t;
+	cd(k,i1,j1,m1,z1, 0) = 0;
+	for (i = 0; i < N; i++)
+	{
+		alf_t_d(k,i1,j1,m1,z1, 0,i) = alf1_N[i];
+		cd(k,i1,j1,m1,z1, 0) += alf_t_d(k,i1,j1,m1,z1, 0,i);
+	}
+
+	cd(k,i1,j1,m1,z1, 0) = -c(0, k) * c(0, k) * cd(k,i1,j1,m1,z1, 0);
+	real_t sum1, sum2;
+	for (t = 1; t<T; t++)
+	{
+		cd(k,i1,j1,m1,z1, t) = 0;
+		for (i = 0; i<N; i++)
+			alf_s_d(k,i1,j1,m1,z1, t-1,i) = 
+				cd(k,i1,j1,m1,z1, t-1) * alf_t(t - 1, i, k) + alf_t_d(k,i1,j1,m1,z1, t-1, i) * c(t-1, k);
+		for (i = 0; i<N; i++)
+		{
+			sum1 = sum2 = 0;
+			for (j = 0; j<N; j++)
+			{
+				sum1 += alf_s_d(k,i1,j1,m1,z1, t-1,i) * A(j, i) + alf(t - 1, j, k) * a_N[j*N+i];
+				sum2 += alf(t - 1, j, k) * A(j, i);
+			}
+			alf_t_d(k,i1,j1,m1,z1, t,i) = sum1 * B(i, t, k) + sum2 * b_N[i*T+t];
+			cd(k,i1,j1,m1,z1, t) += alf_t_d(k,i1,j1,m1,z1, t,i);
+		}
+		cd(k,i1,j1,m1,z1, t) = -c(t, k) * c(t, k) * cd(k,i1,j1,m1,z1, t);
+	}
+
+	real_t deriv = 0;
+	for (t = 0; t<T; t++)
+		deriv += cd(k,i1,j1,m1,z1, t) / c(t, k);
+	return deriv;
+}
+
+__kernel void k_4_0(__global real_t * arr)
+{
+	size_t i = get_global_id(0);
+	arr[i] = 0.0;
+}
+
+__kernel void k_4_1_1(int N, int T, int K, __global real_t * alf1_PI, __global real_t * B)
+{
+	size_t k = get_global_id(0);
+	size_t i = get_global_id(1);
+	size_t j = get_global_id(2);
+	alf1_PI(k, i, j) = (j == i) ? B(i, 0, k) : 0;
+}
+
+__kernel void k_4_1_2(int N, int M, int Z, int T, int K, 
+				__global real_t * alf1_PI, __global real_t * a_zero, __global real_t * b_zero,
+				__global real_t * cd, __global real_t * alf_t_d, __global real_t * alf_s_d,
+				__global real_t * c, __global real_t * alf, __global real_t * alf_t, 
+				__global real_t * A, __global real_t * B, __global real_t * d_PI)
+{
+	size_t k = get_global_id(0);
+	size_t i = get_global_id(1);
+	real_t temp = calc_alpha_der(k,i,0,0,0,
+									N, M, Z, T, K, &alf1_PI(k, i, 0), a_zero, b_zero, 
+									cd, alf_t_d, alf_s_d, c, alf, alf_t, A, B);
+	d_PI[k*N + i] = isfinite(temp) ? temp : 0.0;
+}
+
+__kernel void k_4_2_1(int N, __global real_t * a_A)
+{
+	size_t k = get_global_id(0);
+	size_t i = get_global_id(1);
+	size_t j = get_global_id(2);
+	int i1, j1;
+	for (i1 = 0; i1 < N; i1++)
+		for (j1 = 0; j1 < N; j1++)
+			a_A(k, i, j, i1, j1) = (i1 == i && j1 == j) ? 1 : 0;
+}
+
+__kernel void k_4_2_2(int N, int M, int Z, int T, int K, 
+				__global real_t * alf1_zero, __global real_t * a_A, __global real_t * b_zero,
+				__global real_t * cd, __global real_t * alf_t_d, __global real_t * alf_s_d,
+				__global real_t * c, __global real_t * alf, __global real_t * alf_t, 
+				__global real_t * A, __global real_t * B, __global real_t * d_A)
+{
+	size_t k = get_global_id(0);
+	size_t i = get_global_id(1);
+	size_t j = get_global_id(2);
+	real_t temp = calc_alpha_der(k,i,j,0,0, 
+									N, M, Z, T, K, alf1_zero, &a_A(k, i, j, 0, 0), b_zero,
+									cd, alf_t_d, alf_s_d, c, alf, alf_t, A, B);
+	d_A(k, i, j) = isfinite(temp) ? temp : 0.0;
+}
+
+
+__kernel void k_4_3_1(int N, int M, int Z, int T, int K,
+				__global real_t * b_MUSIG, __global real_t * TAU, __global real_t * g,
+				__global real_t * Otr, __global real_t * MU, __global real_t * SIG)
+{
+	size_t k = get_global_id(0);
+	size_t t = get_global_id(1);
+	size_t i = get_global_id(2);
+	int m, z, i1;
+	for (m = 0; m < M; m++)
+		for (z = 0; z < Z; z++)
+			for (i1 = 0; i1 < N; i1++)
+				b_MUSIG(k, i, m, z, i1, t) = (i1 == i) ? 0.5 * TAU(i, m) * g(t, k, i, m, 0) * (Otr(k, t, z) - MU(z, i, m)) / SIG(z, z, i, m) : 0;
+}
+
+__kernel void k_4_3_2(int N, int M, int Z, int T,
+				__global real_t * alf1_MUSIG, __global real_t * PI, __global real_t * b_MUSIG)
+{
+	size_t k = get_global_id(0);
+	size_t i = get_global_id(1);
+	size_t m = get_global_id(2);
+	int z, i1;
+	for (z = 0; z < Z; z++)
+		for (i1 = 0; i1 < N; i1++)
+			alf1_MUSIG(k, i, m, z, i1) = PI[i] * b_MUSIG(k, i, m, z, i1, 0);
+}
+
+__kernel void k_4_3_3(int N, int M, int Z, int T, int K,
+				__global real_t * alf1_MUSIG, __global real_t * a_zero, __global real_t * b_MUSIG,
+				__global real_t * cd, __global real_t * alf_t_d, __global real_t * alf_s_d,
+				__global real_t * c, __global real_t * alf, __global real_t * alf_t, 
+				__global real_t * A, __global real_t * B, __global real_t * d_MU)
+{
+	size_t k = get_global_id(0);
+	size_t i = get_global_id(1);
+	size_t mz = get_global_id(2);
+	size_t m = mz / Z;
+	size_t z = mz % Z;
+	//for (z = 0; z < Z; z++)
+	//{
+		real_t temp = calc_alpha_der(k,i,0,m,z,
+										N, M, Z, T, K, 
+										&alf1_MUSIG(k, i, m, z, 0), a_zero, &b_MUSIG(k, i, m, z, 0, 0),
+										cd, alf_t_d, alf_s_d, c, alf, alf_t, A, B);
+		d_MU(k, z, i, m) = isfinite(temp) ? temp : 0.0;
+	//}
+}
+
+__kernel void k_4_4_1(int N, int M, int Z,
+				__global real_t * dets, __global real_t * SIG)
+{
+	size_t k = get_global_id(0);
+	size_t i = get_global_id(1);
+	size_t m = get_global_id(2);
+	int z;
+	dets(k, i, m) = 1.0;
+	for (z = 0; z < Z; z++)
+		dets(k, i, m) *= SIG(z, z, i, m);
+}
+
+__kernel void k_4_4_2(int N, int M, int Z, int T, int K,
+				__global real_t * b_MUSIG, __global real_t * TAU, __global real_t * g,
+				__global real_t * Otr, __global real_t * MU, __global real_t * SIG,
+				__global real_t * dets)
+{
+	size_t k = get_global_id(0);
+	size_t t = get_global_id(1);
+	size_t i = get_global_id(2);
+	int m, z, i1;
+	for (m = 0; m < M; m++)
+		for (z = 0; z < Z; z++)
+			for (i1 = 0; i1 < N; i1++)
+				b_MUSIG(k, i, m, z, i1, t) = (i1 == i) ? TAU(i, m) * g(t, k, i, m, 0) * 0.5 * (pow((Otr(k, t, z) - MU(z, i, m)) / SIG(z, z, i, m), 2.0) - 1. / dets(k, i, m)) : 0;
+				// optimize pow!!
+}
+
+__kernel void k_4_4_3(int N, int M, int Z, int T,
+				__global real_t * alf1_MUSIG, __global real_t * PI, __global real_t * b_MUSIG)
+{
+	size_t k = get_global_id(0);
+	size_t i = get_global_id(1);
+	size_t m = get_global_id(2);
+	int z, i1;
+	for (z = 0; z < Z; z++)
+		for (i1 = 0; i1 < N; i1++)
+			alf1_MUSIG(k, i, m, z, i1) = PI[i] * b_MUSIG(k, i, m, z, i1, 0);
+}
+
+__kernel void k_4_4_4(int N, int M, int Z, int T, int K,
+				__global real_t * alf1_MUSIG, __global real_t * a_zero, __global real_t * b_MUSIG,
+				__global real_t * cd, __global real_t * alf_t_d, __global real_t * alf_s_d,
+				__global real_t * c, __global real_t * alf, __global real_t * alf_t, 
+				__global real_t * A, __global real_t * B, __global real_t * d_SIG)
+{
+	size_t k = get_global_id(0);
+	size_t i = get_global_id(1);
+	size_t mz = get_global_id(2);
+	size_t m = mz / Z;
+	size_t z = mz % Z;
+	//for (z = 0; z < Z; z++)
+	//{
+		real_t temp = calc_alpha_der(k,i,0,m,z,
+										N, M, Z, T, K,
+										&alf1_MUSIG(k, i, m, z, 0), a_zero, &b_MUSIG(k, i, m, z, 0, 0),
+										cd, alf_t_d, alf_s_d, c, alf, alf_t, A, B);
+		d_SIG(k, z, i, m) = isfinite(temp) ? temp : 0.0;
+	//}
+}
+
+__kernel void k_4_5_1(int N, int M, int Z, int T, int K,
+				__global real_t * b_TAU, __global real_t * g)
+{
+	size_t k = get_global_id(0);
+	size_t t = get_global_id(1);
+	size_t i = get_global_id(2);
+	int m, i1;
+	for (m = 0; m < M; m++)
+		for (i1 = 0; i1 < N; i1++)
+			b_TAU(k, i, m, i1, t) = (i1 == i) ? g(t, k, i, m, 0) : 0;	// fixed!
+}
+
+__kernel void k_4_5_2(int N, int M, int Z, int T, int K,
+				__global real_t * alf1_TAU, __global real_t * PI, __global real_t * b_TAU)
+{
+	size_t k = get_global_id(0);
+	size_t i = get_global_id(1);
+	size_t m = get_global_id(2);
+	int i1;
+	for (i1 = 0; i1 < N; i1++)
+		alf1_TAU(k, i, m, i1) = PI[i1] * b_TAU(k, i, m, i1, 0);			// fixed!
+}
+
+__kernel void k_4_5_3(int N, int M, int Z, int T, int K,
+				__global real_t * alf1_TAU, __global real_t * a_zero, __global real_t * b_TAU,
+				__global real_t * cd, __global real_t * alf_t_d, __global real_t * alf_s_d,
+				__global real_t * c, __global real_t * alf, __global real_t * alf_t, 
+				__global real_t * A, __global real_t * B, __global real_t * d_TAU)
+{
+	size_t k = get_global_id(0);
+	size_t i = get_global_id(1);
+	size_t m = get_global_id(2);
+	real_t temp = calc_alpha_der(k,i,0,m,0,
+									N, M, Z, T, K,
+									&alf1_TAU(k, i, m, 0), a_zero, &b_TAU(k, i, m, 0, 0),
+									cd, alf_t_d, alf_s_d, c, alf, alf_t, A, B);
+	d_TAU(k, i, m) = isfinite(temp) ? temp : 0.0;
+}

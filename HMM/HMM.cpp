@@ -18,20 +18,15 @@ HMM::HMM(std::string filename)
 	f.close();
 
 	//ВЫДЕЛЯЕМ ПАМЯТЬ ДЛЯ ПАРАМЕТРОВ СММ
-	PI = new real_t[N];				// начальное распределение вероятностей
+	PI = new real_t[N];					// начальное распределение вероятностей
 	A = new real_t[N*N];				// вероятности переходов
 	TAU = new real_t[N*M];			
 	MU = new real_t[N*M*Z];
 	SIG = new real_t[N*M*Z*Z];
-	//alf = new real_t[T*N*K];
-	//bet = new real_t[T*N*K];
 	c = new real_t[T*K];				// коэффициенты масштаба
 	ksi = new real_t[(T-1)*N*N*K];	
 	gam = new real_t[T*N*K];
 	gamd = new real_t[T*N*M*K];
-	//alf_t = new real_t[T*N*K];
-	//bet_t = new real_t[T*N*K];
-	//B = new real_t[N*T*K];			// вероятности появления наблюдений
 
 	//начальные приближения
 	A1 = new real_t[N*N];
@@ -81,9 +76,6 @@ HMM::HMM(std::string filename)
 					for(cl_int z2=0;z2<Z;z2++)
 						f>>SIG1(z1,z2,i,m,n);
 	f.close();
-
-	// инициализируем среду OpenCL
-	//initializeOpenCL();
 }
 
 
@@ -134,6 +126,47 @@ void HMM::bindOpenCL(cl::Context * context_, std::map<std::string,cl::Kernel*> &
 	g_b = new cl::Buffer(*context,NULL,T*K*N*M*NumInit*sizeof(real_t));
 }
 
+void HMM::allocateDerivatives(int K)
+{
+	d_PI_b = new cl::Buffer(*context, NULL, K*N*sizeof(real_t));
+	d_A_b = new cl::Buffer(*context, NULL, K*N*N*sizeof(real_t));
+	d_TAU_b = new cl::Buffer(*context, NULL, K*N*M*sizeof(real_t));
+	d_MU_b = new cl::Buffer(*context, NULL, K*Z*N*M*sizeof(real_t));
+	d_SIG_b = new cl::Buffer(*context, NULL, K*Z*N*M*sizeof(real_t));
+
+	alf1_zero_b = new cl::Buffer(*context, NULL, N*sizeof(real_t));
+	a_zero_b = new cl::Buffer(*context, NULL, N*N*sizeof(real_t));
+	b_zero_b = new cl::Buffer(*context, NULL, N*T*sizeof(real_t));
+	alf1_PI_b = new cl::Buffer(*context, NULL, K*N*N*sizeof(real_t));
+	alf1_MUSIG_b = new cl::Buffer(*context, NULL, K*N*M*Z*N*sizeof(real_t));
+	alf1_TAU_b = new cl::Buffer(*context, NULL, K*N*M*N*sizeof(real_t));
+	a_A_b = new cl::Buffer(*context, NULL, K*N*N*N*N*sizeof(real_t));
+	b_MUSIG_b = new cl::Buffer(*context, NULL, K*N*M*Z*N*T*sizeof(real_t));
+	b_TAU_b = new cl::Buffer(*context, NULL, K*N*M*N*T*sizeof(real_t));
+	dets_b = new cl::Buffer(*context, NULL, K*N*M*sizeof(real_t));
+
+	cd_b = new cl::Buffer(*context, NULL, K*N*N*M*Z* T*sizeof(real_t));
+	alf_t_d_b = new cl::Buffer(*context, NULL, K*N*N*M*Z* T*N*sizeof(real_t));
+	alf_s_d_b = new cl::Buffer(*context, NULL, K*N*N*M*Z* T*N*sizeof(real_t));
+
+	// kernel 4.0 - alf1_zero
+	cl::Kernel * kernel = kernels["k_4_0"];
+	kernel->setArg(0, *alf1_zero_b);
+	int err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N), cl::NullRange);
+	checkErr(err, "k_4_0");
+	// kernel 4.0 - a_zero
+	kernel = kernels["k_4_0"];
+	kernel->setArg(0, *a_zero_b);
+	err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N*N), cl::NullRange);
+	checkErr(err, "k_4_0");
+	// kernel 4.0 - b_zero
+	kernel = kernels["k_4_0"];
+	kernel->setArg(0, *b_zero_b);
+	err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(N*T), cl::NullRange);
+	checkErr(err, "k_4_0");
+	// TODO: free derivatives!
+}
+
 /*void HMM::showInfo()
 {
 	// узнаем об устройствах и кернеле
@@ -180,7 +213,7 @@ void HMM::findModelParameters()
 		// если данная оценка дала результат лучше - сохраним её
 		if(p>p0)
 		{
-			// TODO: load pi,a,tau,mu,sig from gpu and save here
+			// load pi,a,tau,mu,sig from gpu and save here
 			cl_int err = queue->enqueueReadBuffer(*PI_b, CL_TRUE, 0, N*sizeof(real_t), PI);	
 			checkErr(err, "enqueueReadBuffer() - PI_b");
 			err = queue->enqueueReadBuffer(*A_b, CL_TRUE, 0, N*N*sizeof(real_t), A);	
@@ -231,21 +264,14 @@ void HMM::classifyObservations(real_t * p)
 {
 	// внутренние вычисления
 	internal_calculations(-1);
-	//printf("point-1\n");
+
 	// get c from GPU
 	cl_int err = queue->enqueueReadBuffer(*c_b, CL_TRUE, 0, T*K*sizeof(real_t), c);	
 	checkErr(err, "enqueueReadBuffer() - c_b");
 
-	// кернел 5  (параллел)
-	/*std::cout << "classification probabilities:" << std::endl;
-	for(cl_int k=0;k<K;k++){
-		for(cl_int t=0;t<T;t++)
-			p[k]-=log(c(t,k));
-		std::cout << p[k] << std::endl;
-	}*/
-	for(cl_int k=0;k<K;k++)
-		for(cl_int t=0;t<T;t++)
-			p[k]-=log(c(t,k));
+	for(cl_int k = 0; k < K; k++)
+		for(cl_int t = 0; t < T; t++)
+			p[k] -= log(c(t,k));
 }
 
 real_t HMM::calcBaumWelсh(cl_int n)
@@ -552,7 +578,6 @@ real_t HMM::calcBaumWelсh(cl_int n)
 	delete gam_sum;
 	delete gamd_sum;
 	
-	// load c here from GPU
 	err = last_event.wait();
 
 	return calcProbability();
@@ -822,7 +847,7 @@ real_t HMM::calcProbability()
 	return res;
 }
 
-void HMM::getTestObserv(std::string fname)
+void HMM::getObservations(std::string fname)
 {
 	std::fstream f;
 	f.open(fname,std::fstream::in);
@@ -837,3 +862,278 @@ void HMM::getTestObserv(std::string fname)
 	checkErr(err, "enqueueWritedBuffer() - Otr_b");
 }
 
+void HMM::getObservations(std::string fname, real_t * Otr)
+{
+	std::fstream f;
+	f.open(fname, std::fstream::in);
+	for (int k = 0; k<K; ++k)
+		for (int t = 0; t<T; t++)
+			for (int z = 0; z<Z; z++)
+				f >> Otr(k, t, z);
+	f.close();
+}
+
+// for debug means
+void saveDerivativesToFile(std::string fileName, int N, int M, int Z, int K, real_t * d_PI, real_t * d_A, real_t * d_TAU, real_t * d_MU, real_t * d_SIG)
+{
+	std::ofstream f;
+	f.open(fileName, std::fstream::out);
+	f << "Model" << std::endl;
+	for (int k = 0; k < K; k++)
+	{
+		f << "k = " << k << std::endl;
+		f << "PI " << std::endl;
+		for (int i = 0, size = 2 * N; i < size; i++)
+			f << d_PI[k*size + i] << " ";
+		f << std::endl;
+		f << "A " << std::endl;
+		for (int i = 0, size = 2 * N*N; i < size; i++)
+			f << d_A[k*size + i] << " ";
+		f << std::endl;
+		f << "TAU " << std::endl;
+		for (int i = 0, size = 2 * N*M; i < size; i++)
+			f << d_TAU[k*size + i] << " ";
+		f << std::endl;
+		f << "MU " << std::endl;
+		for (int i = 0, size = 2 * Z*N*M; i < size; i++)
+			f << d_MU[k*size + i] << " ";
+		f << std::endl;
+		f << "SIG " << std::endl;
+		for (int i = 0, size = 2 * Z*N*M; i < size; i++){
+			f << d_SIG[k*size + i] << " ";
+		}
+		f << std::endl;
+	}
+	f.close();
+}
+
+svm_model * HMM::trainWithDerivatives(real_t ** observations, int K, HMM ** models, int numModels, svm_scaling_parameters & scalingParams)
+{
+	int N = models[0]->N, M = models[0]->M, Z = models[0]->Z, T = models[0]->T;	// all the same
+	// allocate memory for training derivatives for model 1 and 2
+	real_t ** d_PI = new real_t *[numModels];
+	real_t ** d_A = new real_t *[numModels];
+	real_t ** d_TAU = new real_t *[numModels];
+	real_t ** d_MU = new real_t *[numModels];
+	real_t ** d_SIG = new real_t *[numModels];
+	d_PI[0] = new real_t[2*K*N];
+	d_A[0] = new real_t[2*K*N*N];
+	d_TAU[0] = new real_t[2*K*N*M];
+	d_MU[0] = new real_t[2*K*Z*N*M];
+	d_SIG[0] = new real_t[2*K*Z*N*M];
+	d_PI[1] = new real_t[2*K*N];
+	d_A[1] = new real_t[2*K*N*N];
+	d_TAU[1] = new real_t[2*K*N*M];
+	d_MU[1] = new real_t[2*K*Z*N*M];
+	d_SIG[1] = new real_t[2*K*Z*N*M];
+
+	// TODO: allocate memory on GPU for derivatives and misc
+	models[0]->allocateDerivatives(K);
+	models[1]->allocateDerivatives(K);
+
+	/// таймер
+	LARGE_INTEGER frequency;        // ticks per second
+	LARGE_INTEGER t1, t2;           // ticks
+	double elapsedTime;
+	QueryPerformanceFrequency(&frequency);  // get ticks per second
+	/// таймер
+	QueryPerformanceCounter(&t1);				// start timer
+
+	// calculate derivatives for 1st model and 1st training observations
+	models[0]->calcDerivatives(observations[0], K, &d_PI[0][0], &d_A[0][0], &d_TAU[0][0], &d_MU[0][0], &d_SIG[0][0]);
+	// calculate derivatives for 1st model and 2nd training observations
+	models[0]->calcDerivatives(observations[1], K, &d_PI[0][K*N], &d_A[0][K*N*N], &d_TAU[0][K*N*M], &d_MU[0][K*Z*N*M], &d_SIG[0][K*Z*N*M]);
+	// calculate derivatives for 2nd model and 1st training observations
+	models[1]->calcDerivatives(observations[0], K, &d_PI[1][0], &d_A[1][0], &d_TAU[1][0], &d_MU[1][0], &d_SIG[1][0]);
+	// calculate derivatives for 2st model and 2nd training observations
+	models[1]->calcDerivatives(observations[1], K, &d_PI[1][K*N], &d_A[1][K*N*N], &d_TAU[1][K*N*M], &d_MU[1][K*Z*N*M], &d_SIG[1][K*Z*N*M]);
+	
+	QueryPerformanceCounter(&t2);				// stop timer
+	elapsedTime = (1.0*t2.QuadPart - 1.0*t1.QuadPart) / (frequency.QuadPart*1.0);
+	printf("Derivatives learning complete\nElapsed time = %f s.\n", elapsedTime);
+
+	// debug
+	saveDerivativesToFile("M1_train_derivs.txt", N, M, Z, K, d_PI[0], d_A[0], d_TAU[0], d_MU[0], d_SIG[0]);
+	saveDerivativesToFile("M2_train_derivs.txt", N, M, Z, K, d_PI[1], d_A[1], d_TAU[1], d_MU[1], d_SIG[1]);
+	// debug
+
+	// SVM training
+	svm_model model;
+
+	// TODO: free memory
+	return &model;
+}
+
+void HMM::calcDerivatives(real_t * observations, int nOfSequences, real_t * d_PI, real_t * d_A, real_t * d_TAU, real_t * d_MU, real_t * d_SIG)
+{
+	real_t * old_Otr = Otr;
+	int old_K = K;
+	Otr = observations;
+	K = nOfSequences;
+	cl::Buffer * old_Otr_b = Otr_b;
+
+	// TODO: resize B, g, etc. accordingly to nOfSequences (K)
+
+	// load observations to GPU
+	Otr_b = new cl::Buffer(*context, CL_MEM_COPY_HOST_PTR, K*T*Z*sizeof(real_t), Otr);
+
+	// carry out some internal calculations 
+	internal_calculations(-1);
+
+	// calc derivative for each parameter and each sequence
+	calc_derivatives_for_all_sequences();
+
+	// load calculated derivatives to cpu stored derivatives
+	cl_int err = queue->enqueueReadBuffer(*d_PI_b, CL_TRUE, 0, K*N*sizeof(real_t), d_PI);
+	checkErr(err, "enqueueReadBuffer() - d_PI_b");
+	err = queue->enqueueReadBuffer(*d_A_b, CL_TRUE, 0, K*N*N*sizeof(real_t), d_A);
+	checkErr(err, "enqueueReadBuffer() - d_A_b");
+	err = queue->enqueueReadBuffer(*d_TAU_b, CL_TRUE, 0, K*N*M*sizeof(real_t), d_TAU);
+	checkErr(err, "enqueueReadBuffer() - d_TAU_b");
+	err = queue->enqueueReadBuffer(*d_MU_b, CL_TRUE, 0, K*Z*N*M*sizeof(real_t), d_MU);
+	checkErr(err, "enqueueReadBuffer() - d_MU_b");
+	err = queue->enqueueReadBuffer(*d_SIG_b, CL_TRUE, 0, K*Z*N*M*sizeof(real_t), d_SIG);
+	checkErr(err, "enqueueReadBuffer() - d_SIG_b");
+
+	delete Otr_b;	// delete processed observations
+	Otr = old_Otr;
+	K = old_K;
+	Otr_b = old_Otr_b;
+}
+
+void HMM::calc_derivatives_for_all_sequences()
+{
+	int err;
+//#define d_A(k,i,j) d_A[((k)*N+i)*N+j]
+//#define d_TAU(k,i,m) d_TAU[((k)*N+i)*M+m]
+//#define d_MU(k,z,i,m) d_MU[(((k)*N+i)*M+m)*Z+z]
+//#define d_SIG(k,z,i,m) d_SIG[(((k)*N+i)*M+m)*Z+z]
+//#define dets(k,i,m) dets[((k)*N+i)*M+m]
+//#define a_A(k,i,j,i1,j1) a_A[((((k)*N+i)*N+j)*N+i1)*N+j1]
+//#define b_MUSIG(k,i,m,z,i1,t) b_MUSIG[(((((k)*N+i)*M+m)*Z+z)*N+i1)*T+t]
+//#define b_TAU(k, i, m, i1, t) b_TAU[((((k)*N+i)*M+m)*N+i1)*T+t]
+//#define alf1_PI(k,i,j) alf1_PI[((k)*N+i)*N+j]
+//#define alf1_MUSIG(k, i, m, z, i1) alf1_MUSIG[((((k)*N+i)*M+m)*Z+z)*N+i1]
+//#define alf1_TAU(k, i, m, i1) alf1_TAU[(((k)*N+i)*M+m)*N+i1]
+
+	// derivatives with respect to PI 
+	cl::Kernel * kernel;
+	// kernel 4.1.1 KxNxN
+	kernel = kernels["k_4_1_1"];
+	kernel->setArg(0, N); kernel->setArg(1, T); kernel->setArg(2, K);
+	kernel->setArg(3, *alf1_PI_b); kernel->setArg(4, *B_b);
+	err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(K, N, N), cl::NullRange);
+	checkErr(err, "k_4_1_1");
+
+	// kernel 4.1.2 KxN
+	kernel = kernels["k_4_1_2"];
+	kernel->setArg(0, N); kernel->setArg(1, M); kernel->setArg(2, Z); kernel->setArg(3, T); kernel->setArg(4, K);
+	kernel->setArg(5, *alf1_PI_b); kernel->setArg(6, *a_zero_b); kernel->setArg(7, *b_zero_b);
+	kernel->setArg(8, *cd_b); kernel->setArg(9, *alf_t_d_b); kernel->setArg(10, *alf_s_d_b);
+	kernel->setArg(11, *c_b); kernel->setArg(12, *alf_b); kernel->setArg(13, *alf_t_b);
+	kernel->setArg(14, *A_b); kernel->setArg(15, *B_b); kernel->setArg(16, *d_PI_b);
+	err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(K, N), cl::NullRange);
+	checkErr(err, "k_4_1_2");
+
+	// derivatives with respect to A 
+	// kernel 4.2.1 (KxNxNxNxN)
+	kernel = kernels["k_4_2_1"];
+	kernel->setArg(0, N); kernel->setArg(1, *a_A_b);
+	err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(K, N, N), cl::NullRange);
+	checkErr(err, "k_4_2_1");
+
+	// kernel 4.2.2 (KxNxN)
+	kernel = kernels["k_4_2_2"];
+	kernel->setArg(0, N); kernel->setArg(1, M); kernel->setArg(2, Z); kernel->setArg(3, T); kernel->setArg(4, K);
+	kernel->setArg(5, *alf1_zero_b); kernel->setArg(6, *a_A_b); kernel->setArg(7, *b_zero_b);
+	kernel->setArg(8, *cd_b); kernel->setArg(9, *alf_t_d_b); kernel->setArg(10, *alf_s_d_b);
+	kernel->setArg(11, *c_b); kernel->setArg(12, *alf_b); kernel->setArg(13, *alf_t_b);
+	kernel->setArg(14, *A_b); kernel->setArg(15, *B_b); kernel->setArg(16, *d_A_b);
+	err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(K, N, N), cl::NullRange);
+	checkErr(err, "k_4_2_2");
+
+
+	// derivatives with respect to MU
+	// kernel 4.3.1 (KxNxMxZxNxT)
+	kernel = kernels["k_4_3_1"];
+	kernel->setArg(0, N); kernel->setArg(1, M); kernel->setArg(2, Z); kernel->setArg(3, T); kernel->setArg(4, K); 
+	kernel->setArg(5, *b_MUSIG_b); kernel->setArg(6, *TAU_b); kernel->setArg(7, *g_b); kernel->setArg(8, *Otr_b);
+	kernel->setArg(9, *MU_b); kernel->setArg(10, *SIG_b);
+	err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(K, T, N), cl::NullRange);
+	checkErr(err, "k_4_3_1");
+
+	// kernel 4.3.2 (KxNxMxZxN)
+	kernel = kernels["k_4_3_2"];
+	kernel->setArg(0, N); kernel->setArg(1, M); kernel->setArg(2, Z); kernel->setArg(3, T);
+	kernel->setArg(4, *alf1_MUSIG_b); kernel->setArg(5, *PI_b); kernel->setArg(6, *b_MUSIG_b);
+	err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(K, N, M), cl::NullRange);
+	checkErr(err, "k_4_3_2");
+
+	// kernel 4.3.3 (KxZxNxM)
+	kernel = kernels["k_4_3_3"];
+	kernel->setArg(0, N); kernel->setArg(1, M); kernel->setArg(2, Z); kernel->setArg(3, T); kernel->setArg(4, K);
+	kernel->setArg(5, *alf1_MUSIG_b); kernel->setArg(6, *a_zero_b); kernel->setArg(7, *b_MUSIG_b);
+	kernel->setArg(8, *cd_b); kernel->setArg(9, *alf_t_d_b); kernel->setArg(10, *alf_s_d_b);
+	kernel->setArg(11, *c_b); kernel->setArg(12, *alf_b); kernel->setArg(13, *alf_t_b);
+	kernel->setArg(14, *A_b); kernel->setArg(15, *B_b); kernel->setArg(16, *d_MU_b);
+	err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(K, N, M*Z), cl::NullRange);
+	checkErr(err, "k_4_3_3");
+
+	// derivatives with respect to SIG
+	// kernel 4.4.1 (KxNxM)
+	kernel = kernels["k_4_4_1"];
+	kernel->setArg(0, N); kernel->setArg(1, M); kernel->setArg(2, Z);
+	kernel->setArg(3, *dets_b); kernel->setArg(4, *SIG_b); 
+	err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(K, N, M), cl::NullRange);
+	checkErr(err, "k_4_4_1");
+
+	// kernel 4.4.2 (KxNxMxZxN)
+	kernel = kernels["k_4_4_2"];
+	kernel->setArg(0, N); kernel->setArg(1, M); kernel->setArg(2, Z); kernel->setArg(3, T); kernel->setArg(4, K);
+	kernel->setArg(5, *b_MUSIG_b); kernel->setArg(6, *TAU_b); kernel->setArg(7, *g_b); kernel->setArg(8, *Otr_b);
+	kernel->setArg(9, *MU_b); kernel->setArg(10, *SIG_b); kernel->setArg(11, *dets_b);
+	err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(K, T, N), cl::NullRange);
+	checkErr(err, "k_4_4_2");
+
+	// kernel 4.4.3 (KxNxMxZxN)
+	kernel = kernels["k_4_4_3"];
+	kernel->setArg(0, N); kernel->setArg(1, M); kernel->setArg(2, Z); kernel->setArg(3, T);
+	kernel->setArg(4, *alf1_MUSIG_b); kernel->setArg(5, *PI_b); kernel->setArg(6, *b_MUSIG_b);
+	err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(K, N, M), cl::NullRange);
+	checkErr(err, "k_4_4_3");
+
+	// kernel 4.4.4 (KxZxNxM)
+	kernel = kernels["k_4_4_4"];
+	kernel->setArg(0, N); kernel->setArg(1, M); kernel->setArg(2, Z); kernel->setArg(3, T); kernel->setArg(4, K);
+	kernel->setArg(5, *alf1_MUSIG_b); kernel->setArg(6, *a_zero_b); kernel->setArg(7, *b_MUSIG_b);
+	kernel->setArg(8, *cd_b); kernel->setArg(9, *alf_t_d_b); kernel->setArg(10, *alf_s_d_b);
+	kernel->setArg(11, *c_b); kernel->setArg(12, *alf_b); kernel->setArg(13, *alf_t_b);
+	kernel->setArg(14, *A_b); kernel->setArg(15, *B_b); kernel->setArg(16, *d_SIG_b);
+	err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(K, N, M*Z), cl::NullRange);
+	checkErr(err, "k_4_4_4");
+
+	// derivatives with respect to TAU
+	// kernel 4.5.1 (KxNxMxNxT)
+	kernel = kernels["k_4_5_1"];
+	kernel->setArg(0, N); kernel->setArg(1, M); kernel->setArg(2, Z); kernel->setArg(3, T); kernel->setArg(4, K);
+	kernel->setArg(5, *b_TAU_b); kernel->setArg(6, *g_b);
+	err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(K, T, N), cl::NullRange);
+	checkErr(err, "k_4_5_1");
+
+	// kernel 4.5.2 (KxNxMxN)
+	kernel = kernels["k_4_5_2"];
+	kernel->setArg(0, N); kernel->setArg(1, M); kernel->setArg(2, Z); kernel->setArg(3, T); kernel->setArg(4, K);
+	kernel->setArg(5, *alf1_TAU_b); kernel->setArg(6, *PI_b); kernel->setArg(7, *b_TAU_b);
+	err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(K, N, M), cl::NullRange);
+	checkErr(err, "k_4_5_2");
+
+	// kernel 4.5.3 (KxNxM)
+	kernel = kernels["k_4_5_3"];
+	kernel->setArg(0, N); kernel->setArg(1, M); kernel->setArg(2, Z); kernel->setArg(3, T); kernel->setArg(4, K);
+	kernel->setArg(5, *alf1_TAU_b); kernel->setArg(6, *a_zero_b); kernel->setArg(7, *b_TAU_b);
+	kernel->setArg(8, *cd_b); kernel->setArg(9, *alf_t_d_b); kernel->setArg(10, *alf_s_d_b);
+	kernel->setArg(11, *c_b); kernel->setArg(12, *alf_b); kernel->setArg(13, *alf_t_b);
+	kernel->setArg(14, *A_b); kernel->setArg(15, *B_b); kernel->setArg(16, *d_TAU_b);
+	err = queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(K, N, M), cl::NullRange);
+	checkErr(err, "k_4_5_3");
+}

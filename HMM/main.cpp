@@ -9,8 +9,6 @@
 #include "HMM.h"
 #include <windows.h>
 
-
-
 // подсчет процента верно распознанных последовательностей
 void classClassify(real_t * p1, real_t * p2, real_t &percent1, real_t &percent2, int K)
 {
@@ -24,8 +22,6 @@ void classClassify(real_t * p1, real_t * p2, real_t &percent1, real_t &percent2,
 	percent2/=K;
 }
 
-
-//k
 // инциализируем OpenCL
 bool initializeOpenCL(cl::Context *& context, std::map<std::string, cl::Kernel*> & kernels, cl::CommandQueue *& queue)
 {
@@ -54,24 +50,21 @@ bool initializeOpenCL(cl::Context *& context, std::map<std::string, cl::Kernel*>
 		delete context;
 		std::cout << std::endl;
 	}
-	//std::cout << std::endl;
 
 	// создание контекста
 	// ВНИМАНИЕ! УСТРОЙСТВО, НА КОТОРОМ БУДУТ ПРОВОДИТЬСЯ ВЫЧИСЛЕНИЕ ЗАДАЕТСЯ В platformList[НОМЕР_УСТРОЙСТВА] !!!!
 	cl_context_properties cprops[3] =
-	{ CL_CONTEXT_PLATFORM, (cl_context_properties)(platformList[0])(), 0 };		// зададим свойства для ВЫБРАННОЙ платформы
-	//context = new cl::Context(CL_DEVICE_TYPE_GPU, cprops, NULL, NULL, &err);		// создадим контекст устройства с заданными свойствами
-	context = new cl::Context(CL_DEVICE_TYPE_ALL, cprops, NULL, NULL, &err);
+	{ CL_CONTEXT_PLATFORM, (cl_context_properties)(platformList[1])(), 0 };		// зададим свойства для ВЫБРАННОЙ платформы
+	context = new cl::Context(CL_DEVICE_TYPE_GPU, cprops, NULL, NULL, &err);	// создадим контекст устройства с заданными свойствами
 	checkErr(err, "Context::Context()");
 
 	// получение устройств для контекста
 	std::vector<cl::Device> devices = context->getInfo<CL_CONTEXT_DEVICES>();			// получение списка устройств для контеста
 	checkErr(devices.size() > 0 ? CL_SUCCESS : -1, "devices.size() > 0");
-
+	// отображение информации об устройствах
 	std::string deviceName;
 	devices[0].getInfo(CL_DEVICE_NAME, &deviceName);
 	std::cout << "Number of devices: " << devices.size() << std::endl;
-	
 	std::cout << "Current device: " << deviceName << std::endl;
 
 	// загрузка исходного кода кернела и компиляция
@@ -101,10 +94,12 @@ bool initializeOpenCL(cl::Context *& context, std::map<std::string, cl::Kernel*>
 	checkErr(err, "Program::build()");
 	
 	// получение интерфейсов для кернела
-	char * kernelsNames[26] = {"calc_g","calcB","k_2_1","k_2_2","k_2_3_1","k_2_3_2",
+	char * kernelsNames[41] = {"calc_g","calcB","k_2_1","k_2_2","k_2_3_1","k_2_3_2",
 		"k_2_3_3","k_2_4","k_2_5_1","k_2_5_2","k_2_6","k_2_7","k_3_1_1","k_3_1_2","k_3_2_1",
-		"k_3_2_2","k_3_3","k_3_4","k_3_5","k_3_6","k_3_7","k_3_8","k_3_9","k_3_10","k_3_11","k_3_12"};
-	for ( int i=0; i<26; i++)
+		"k_3_2_2","k_3_3","k_3_4","k_3_5","k_3_6","k_3_7","k_3_8","k_3_9","k_3_10","k_3_11","k_3_12",
+		"k_4_0", "k_4_1_1", "k_4_1_2", "k_4_2_1", "k_4_2_2", "k_4_3_1", "k_4_3_2", "k_4_3_3",
+		"k_4_4_1", "k_4_4_2", "k_4_4_3", "k_4_4_4", "k_4_5_1", "k_4_5_2", "k_4_5_3"};
+	for ( int i = 0; i < 41; i++)
 	{
 		kernels[kernelsNames[i]] = new cl::Kernel(program, kernelsNames[i],&err);
 		checkErr(err, "new cl::Kernel()");
@@ -156,15 +151,15 @@ int main(void)
 	real_t * p1_2 = new real_t[K]; for(int i=0; i<K; i++) p1_2[i]=0.;
 	real_t * p2_1 = new real_t[K]; for(int i=0; i<K; i++) p2_1[i]=0.;
 	real_t * p2_2 = new real_t[K]; for(int i=0; i<K; i++) p2_2[i]=0.;
-	M1.getTestObserv("model1\\Otest1.txt");		// считаем 1 тест в 1 модель
-	M2.getTestObserv("model1\\Otest1.txt");		// считаем 1 тест в 2 модель
+	M1.getObservations("model1\\Otest1.txt");		// считаем 1 тест в 1 модель
+	M2.getObservations("model1\\Otest1.txt");		// считаем 1 тест в 2 модель
 	QueryPerformanceCounter(&t1);				// start timer
 	M1.classifyObservations(p1_1);				// классификация последовательностей 1 типа 1 моделью
 	M2.classifyObservations(p1_2);				// классификация последовательностей 1 типа 2 моделью
     QueryPerformanceCounter(&t2);				// stop timer
     elapsedTime = (1.0*t2.QuadPart - 1.0*t1.QuadPart) / (frequency.QuadPart*1.0);
-	M1.getTestObserv("model1\\Otest2.txt");		// считаем 2 тест в 1 модель
-	M2.getTestObserv("model1\\Otest2.txt");		// считаем 2 тест в 2 модель
+	M1.getObservations("model1\\Otest2.txt");		// считаем 2 тест в 1 модель
+	M2.getObservations("model1\\Otest2.txt");		// считаем 2 тест в 2 модель
 	QueryPerformanceCounter(&t1);				// start timer
 	M1.classifyObservations(p2_1);				// классификация последовательностей 2 типа 1 моделью
 	M2.classifyObservations(p2_2);				// классификация последовательностей 2 типа 2 моделью
@@ -192,6 +187,26 @@ int main(void)
 	f.close();
 
 	std::cout << "Percent = " << (succ1+succ2)*0.5 << std::endl;
+
+
+	///
+	/// Обучение с помощью производных
+	///
+	real_t * Olearn1 = new real_t[K * M1.T * M1.Z];
+	real_t * Olearn2 = new real_t[K * M2.T * M2.Z];
+	HMM * models[2] = { &M1, &M2 };						// подготовим массив моделей
+	M1.getObservations("model1\\Ok.txt", Olearn1);		// read learn observations for model 1
+	M2.getObservations("model2\\Ok.txt", Olearn2);		// read learn observations for model 2
+	real_t * trainingObservations[2] = { Olearn1, Olearn2 };	// подготовим обучающие наблюдени¤
+	svm_scaling_parameters scalingParameters;
+	//QueryPerformanceCounter(&t1);				// start timer
+	svm_model * trainedModel = HMM::trainWithDerivatives(trainingObservations, K, models, 2, scalingParameters);
+	//QueryPerformanceCounter(&t2);				// stop timer
+	//elapsedTime = (1.0*t2.QuadPart - 1.0*t1.QuadPart) / (frequency.QuadPart*1.0);
+	//printf("Derivatives learning complete\nElapsed time = %f s.\n", elapsedTime);
+	
+
+	//printf("Derivatives learning complete\n");
 
 	return EXIT_SUCCESS;
 }
