@@ -873,7 +873,7 @@ void HMM::getObservations(std::string fname, real_t * Otr)
 	f.close();
 }
 
-// for debug means
+// for debug means TODO: DEPRICATED BY NOW
 void saveDerivativesToFile(std::string fileName, int N, int M, int Z, int K, real_t * d_PI, real_t * d_A, real_t * d_TAU, real_t * d_MU, real_t * d_SIG)
 {
 	std::ofstream f;
@@ -905,6 +905,73 @@ void saveDerivativesToFile(std::string fileName, int N, int M, int Z, int K, rea
 		f << std::endl;
 	}
 	f.close();
+}
+
+
+///
+/// fill y and x arrays of svm problem with derivatives calculated for one training set and two models
+/// @class_index - belonging of training set
+///
+void fill_svm_problem_with_derivatives(int class_index, int n_of_models,
+						double * prob_y, svm_node * prob_x[],
+						int K, int N, int M, int Z,
+						real_t*d_PI, real_t*d_A, real_t*d_TAU, real_t*d_MU, real_t*d_SIG)
+{
+	int halfVectorLength = N + N*N + N*M + N*M*Z + N*M*Z;	// PI+A+TAU+MU+SIG
+	// allocate memory and fill the training vectors for observations from first model
+	for (int k = 0; k < K; k++)
+	{
+		svm_node * prob_x_k;
+		prob_y[k] = class_index;
+		prob_x_k = prob_x[k] = new svm_node[2 * halfVectorLength+1];	// allocate memory for derivatives vector for 1 and 2 observations (+1 for termination)
+		int ind = 0;												// to set feature indexes correctly
+		for (int j = 0; j < N; j++, ind++)							// fill the vector with PI derivatives
+		{
+			// first part of vector
+			prob_x_k[ind].index = ind + 1;
+			prob_x_k[ind].value = d_PI[j];
+			// second part of vector
+			prob_x_k[ind + halfVectorLength].index = ind + 1 + halfVectorLength;
+			prob_x_k[ind + halfVectorLength].value = d_PI[j+K*N];
+		}
+		for (int j = 0; j < N*N; j++, ind++)						// fill the vector with A derivatives
+		{
+			// first part of vector
+			prob_x_k[ind].index = ind + 1;
+			prob_x_k[ind].value = d_A[j];
+			// second part of vector
+			prob_x_k[ind + halfVectorLength].index = ind + 1 + halfVectorLength;
+			prob_x_k[ind + halfVectorLength].value = d_A[j+K*N*N];
+		}
+		for (int j = 0; j < N*M; j++, ind++)						// fill the vector with TAU derivatives
+		{
+			// first part of vector
+			prob_x_k[ind].index = ind + 1;
+			prob_x_k[ind].value = d_TAU[j];
+			// second part of vector
+			prob_x_k[ind + halfVectorLength].index = ind + 1 + halfVectorLength;
+			prob_x_k[ind + halfVectorLength].value = d_TAU[j + K*N*M];
+		}
+		for (int j = 0; j < N*M*Z; j++, ind++)						// fill the vector with MU derivatives
+		{
+			// first part of vector
+			prob_x_k[ind].index = ind + 1;
+			prob_x_k[ind].value = d_MU[j];
+			// second part of vector
+			prob_x_k[ind + halfVectorLength].index = ind + 1 + halfVectorLength;
+			prob_x_k[ind + halfVectorLength].value = d_MU[j + K*N*M*Z];
+		}
+		for (int j = 0; j < N*M*Z; j++, ind++)						// fill the vector with SIG derivatives
+		{
+			// first part of vector
+			prob_x_k[ind].index = ind + 1;
+			prob_x_k[ind].value = d_SIG[j];
+			// second part of vector
+			prob_x_k[ind + halfVectorLength].index = ind + 1 + halfVectorLength;
+			prob_x_k[ind + halfVectorLength].value = d_SIG[j + K*N*M*Z];
+		}
+		prob_x_k[ind].index = -1;	// terminate vector ??? TODO: check if it is true
+	}
 }
 
 svm_model * HMM::trainWithDerivatives(real_t ** observations, int K, HMM ** models, int numModels, svm_scaling_parameters & scalingParams)
@@ -939,13 +1006,15 @@ svm_model * HMM::trainWithDerivatives(real_t ** observations, int K, HMM ** mode
 	/// таймер
 	QueryPerformanceCounter(&t1);				// start timer
 
+	printf("Derivatives learning start\n");
+
 	// calculate derivatives for 1st model and 1st training observations
 	models[0]->calcDerivatives(observations[0], K, &d_PI[0][0], &d_A[0][0], &d_TAU[0][0], &d_MU[0][0], &d_SIG[0][0]);
+	// calculate derivatives for 2nd model and 2nd training observations
+	models[1]->calcDerivatives(observations[0], K, &d_PI[0][K*N], &d_A[0][K*N*N], &d_TAU[0][K*N*M], &d_MU[0][K*Z*N*M], &d_SIG[0][K*Z*N*M]);
 	// calculate derivatives for 1st model and 2nd training observations
-	models[0]->calcDerivatives(observations[1], K, &d_PI[0][K*N], &d_A[0][K*N*N], &d_TAU[0][K*N*M], &d_MU[0][K*Z*N*M], &d_SIG[0][K*Z*N*M]);
-	// calculate derivatives for 2nd model and 1st training observations
-	models[1]->calcDerivatives(observations[0], K, &d_PI[1][0], &d_A[1][0], &d_TAU[1][0], &d_MU[1][0], &d_SIG[1][0]);
-	// calculate derivatives for 2st model and 2nd training observations
+	models[0]->calcDerivatives(observations[1], K, &d_PI[1][0], &d_A[1][0], &d_TAU[1][0], &d_MU[1][0], &d_SIG[1][0]);
+	// calculate derivatives for 2nd model and 2nd training observations
 	models[1]->calcDerivatives(observations[1], K, &d_PI[1][K*N], &d_A[1][K*N*N], &d_TAU[1][K*N*M], &d_MU[1][K*Z*N*M], &d_SIG[1][K*Z*N*M]);
 	
 	QueryPerformanceCounter(&t2);				// stop timer
@@ -957,11 +1026,43 @@ svm_model * HMM::trainWithDerivatives(real_t ** observations, int K, HMM ** mode
 	saveDerivativesToFile("M2_train_derivs.txt", N, M, Z, K, d_PI[1], d_A[1], d_TAU[1], d_MU[1], d_SIG[1]);
 	// debug
 
+	// prepare SVM problem
+	svm_problem prob;
+	prob.l = 2*K;					// number of derivative vectors for both models
+	prob.y = new double[2*K];		// belonging of each derivative vector
+	prob.x = new svm_node*[2*K];	// derivative vectors
+	
+	fill_svm_problem_with_derivatives(-1, 2, &prob.y[0], &prob.x[0], K, N, M, Z, d_PI[0], d_A[0], d_TAU[0], d_MU[0], d_SIG[0]);
+	fill_svm_problem_with_derivatives(1, 2, &prob.y[K], &prob.x[K], K, N, M, Z, d_PI[1], d_A[1], d_TAU[1], d_MU[1], d_SIG[1]);
+
+	// prepare SVM params
+	svm_parameter param;
+	param.svm_type = C_SVC;
+	param.kernel_type = POLY;
+	param.degree = 3;
+	//param.gamma = 0.0001;
+	param.gamma = 1.0 / (2.0*(N + N*N + N*M + 2*N*M*Z));	// 1/num_features
+	param.coef0 = 10;
+	param.nu = 0.5;
+	param.cache_size = 100;
+	param.C = 1;
+	param.eps = 0.001;
+	param.p = 0.1;
+	//param.eps;
+	param.shrinking = 1;
+	param.probability = 0;
+	param.nr_weight = 0;
+	param.weight_label = NULL;
+	param.weight = NULL;
+
+	// SVM model scaling
+
+
 	// SVM training
-	svm_model model;
+	svm_model * model = svm_train(&prob, &param);
 
 	// TODO: free memory
-	return &model;
+	return model;
 }
 
 void HMM::calcDerivatives(real_t * observations, int nOfSequences, real_t * d_PI, real_t * d_A, real_t * d_TAU, real_t * d_MU, real_t * d_SIG)
