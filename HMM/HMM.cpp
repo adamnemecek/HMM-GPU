@@ -907,12 +907,50 @@ void saveDerivativesToFile(std::string fileName, int N, int M, int Z, int K, rea
 	f.close();
 }
 
+void HMM::scale_svm_problem(svm_problem & prob, svm_scaling_parameters & scalingParams, int num_features)
+{
+	scalingParams.num_features = num_features;
+	scalingParams.lower = -1;
+	scalingParams.upper = 1;
+	scalingParams.feature_min = new double[num_features];
+	scalingParams.feature_max = new double[num_features];
+	for (int i = 0; i < num_features; i++)
+	{
+		scalingParams.feature_min[i] = DBL_MAX ;
+		scalingParams.feature_max[i] = -1000;
+	}
+	// first pass - reveal max and min features
+	for (int i = 0; i < prob.l; i++)
+	{
+		for (int j = 0; j < num_features; j++)
+		{
+			if (scalingParams.feature_min[i] > prob.x[i][j].value)
+				scalingParams.feature_min[i] = prob.x[i][j].value;
+			if (scalingParams.feature_max[i] < prob.x[i][j].value)
+				scalingParams.feature_max[i] = prob.x[i][j].value;
+		}
+	}
+	// second pass - scale all features (could be executed on GPU)
+	for (int i = 0; i < prob.l; i++)
+	{
+		for (int j = 0; j < num_features; j++)
+		{
+			double maxDiff = scalingParams.feature_max[i] - scalingParams.feature_min[i];
+			if (maxDiff != 0.0)
+				prob.x[i][j].value = scalingParams.lower +
+					2.0*(prob.x[i][j].value - scalingParams.feature_min[i]) /
+					(scalingParams.feature_max[i] - scalingParams.feature_min[i]);
+			else
+				prob.x[i][j].value = 0.0;
+		}
+	}
+}
 
 ///
 /// fill y and x arrays of svm problem with derivatives calculated for one training set and two models
 /// @class_index - belonging of training set
 ///
-void fill_svm_problem_with_derivatives(int class_index, int n_of_models,
+void HMM::fill_svm_problem_with_derivatives(int class_index, int n_of_models,
 						double * prob_y, svm_node * prob_x[],
 						int K, int N, int M, int Z,
 						real_t*d_PI, real_t*d_A, real_t*d_TAU, real_t*d_MU, real_t*d_SIG)
@@ -970,8 +1008,24 @@ void fill_svm_problem_with_derivatives(int class_index, int n_of_models,
 			prob_x_k[ind + halfVectorLength].index = ind + 1 + halfVectorLength;
 			prob_x_k[ind + halfVectorLength].value = d_SIG[j + K*N*M*Z];
 		}
-		prob_x_k[ind].index = -1;	// terminate vector ??? TODO: check if it is true
+		prob_x_k[2 * halfVectorLength].index = -1;	// terminate vector ??? TODO: check if it is true
+		prob_x_k[2 * halfVectorLength].value = 0.0;
 	}
+}
+
+void save_svm_problem_to_file(std::string fileName, svm_problem & prob, int num_features)
+{
+	std::ofstream file(fileName);
+	for (int i = 0; i < prob.l; i++)
+	{
+		file << prob.y[i] << " ";
+		for (int j = 0; j < num_features+1; j++)
+		{
+			file << prob.x[i][j].index << ":" << prob.x[i][j].value << " ";
+		}
+		file << std::endl;
+	}
+	file.close();
 }
 
 svm_model * HMM::trainWithDerivatives(real_t ** observations, int K, HMM ** models, int numModels, svm_scaling_parameters & scalingParams)
@@ -1032,16 +1086,17 @@ svm_model * HMM::trainWithDerivatives(real_t ** observations, int K, HMM ** mode
 	prob.y = new double[2*K];		// belonging of each derivative vector
 	prob.x = new svm_node*[2*K];	// derivative vectors
 	
-	fill_svm_problem_with_derivatives(-1, 2, &prob.y[0], &prob.x[0], K, N, M, Z, d_PI[0], d_A[0], d_TAU[0], d_MU[0], d_SIG[0]);
-	fill_svm_problem_with_derivatives(1, 2, &prob.y[K], &prob.x[K], K, N, M, Z, d_PI[1], d_A[1], d_TAU[1], d_MU[1], d_SIG[1]);
+	HMM::fill_svm_problem_with_derivatives(-1, 2, &prob.y[0], &prob.x[0], K, N, M, Z, d_PI[0], d_A[0], d_TAU[0], d_MU[0], d_SIG[0]);
+	HMM::fill_svm_problem_with_derivatives(1, 2, &prob.y[K], &prob.x[K], K, N, M, Z, d_PI[1], d_A[1], d_TAU[1], d_MU[1], d_SIG[1]);
 
 	// prepare SVM params
 	svm_parameter param;
 	param.svm_type = C_SVC;
 	param.kernel_type = POLY;
 	param.degree = 3;
+	double num_features = (2.0*(N + N*N + N*M + 2 * N*M*Z));
 	//param.gamma = 0.0001;
-	param.gamma = 1.0 / (2.0*(N + N*N + N*M + 2*N*M*Z));	// 1/num_features
+	param.gamma = 1.0 / num_features;	// 1/num_features
 	param.coef0 = 10;
 	param.nu = 0.5;
 	param.cache_size = 100;
@@ -1055,14 +1110,24 @@ svm_model * HMM::trainWithDerivatives(real_t ** observations, int K, HMM ** mode
 	param.weight_label = NULL;
 	param.weight = NULL;
 
-	// SVM model scaling
+	save_svm_problem_to_file("svm_problem.txt", prob, num_features);
 
+	// SVM model scaling
+	scale_svm_problem(prob, scalingParams, num_features);
+
+	save_svm_problem_to_file("svm_scaledProblem.txt", prob, num_features);
 
 	// SVM training
 	svm_model * model = svm_train(&prob, &param);
 
 	// TODO: free memory
 	return model;
+}
+
+void HMM::classifyWithDerivatives(real_t * observations, int K, svm_model * model, svm_scaling_parameters & scalingParams, int predictions)
+{
+
+	svm_predict(model, x);
 }
 
 void HMM::calcDerivatives(real_t * observations, int nOfSequences, real_t * d_PI, real_t * d_A, real_t * d_TAU, real_t * d_MU, real_t * d_SIG)

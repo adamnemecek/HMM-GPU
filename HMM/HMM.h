@@ -49,10 +49,11 @@ typedef cl_float real_t;
 ///
 struct svm_scaling_parameters
 {
-	real_t lower;
-	real_t upper;
-	real_t * feature_min;
-	real_t * feature_max;
+	int num_features;
+	double lower;
+	double upper;
+	double * feature_min;
+	double * feature_max;
 	void clear()
 	{
 		delete feature_max;
@@ -104,8 +105,13 @@ public:
 	/// @out: scalingParams - параметры, использованные при масштабировании производных перед обучением (передать пустую структуру)
 	/// @return: svmTrainedModel * - обученная SVM модель		
 	static svm_model * trainWithDerivatives(real_t ** observations, int K, HMM ** models, int numModels, svm_scaling_parameters & scalingParams);
+	///
+	/// Классификация по методу производных
+	///
+	static void classifyWithDerivatives(real_t * observations, int K, svm_model * model, svm_scaling_parameters & scalingParams, int predictions);
 	// расчет и возврат производных для наблюдений извне
-	void calcDerivatives(real_t * observations, int nOfSequences, real_t * d_PI, real_t * d_A, real_t * d_TAU, real_t * d_MU, real_t * d_SIG);
+	void calcDerivatives(real_t * observations, int nOfSequences, 
+		real_t * d_PI, real_t * d_A, real_t * d_TAU, real_t * d_MU, real_t * d_SIG);
 private:
 	// нахождение параметров алгоритомом Баума-Велша
 	real_t calcBaumWelсh(cl_int n);
@@ -116,6 +122,15 @@ private:
 
 	// расчет производных для всех последовательностей
 	void calc_derivatives_for_all_sequences();
+
+	// отмасштабировать SVM задачу (svm problem) до -1 +1
+	static void scale_svm_problem(svm_problem & prob, svm_scaling_parameters & scalingParams, int num_features);
+
+	// преобразование вектора проивзодных в SVM задачу (svm problem)
+	static void fill_svm_problem_with_derivatives(int class_index, int n_of_models,
+		double * prob_y, svm_node * prob_x[],
+		int K, int N, int M, int Z,
+		real_t*d_PI, real_t*d_A, real_t*d_TAU, real_t*d_MU, real_t*d_SIG);
 };
 
 void checkErr(cl_int err, const char * name);
