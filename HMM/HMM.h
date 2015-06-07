@@ -108,7 +108,7 @@ public:
 	///
 	/// Классификация по методу производных
 	///
-	static void classifyWithDerivatives(real_t * observations, int K, svm_model * model, svm_scaling_parameters & scalingParams, int predictions);
+	static void classifyWithDerivatives(real_t * observations, int K, HMM ** models, int numModels, svm_model * trained_svm_model, svm_scaling_parameters & scalingParams, int * predictions);
 	// расчет и возврат производных для наблюдений извне
 	void calcDerivatives(real_t * observations, int nOfSequences, 
 		real_t * d_PI, real_t * d_A, real_t * d_TAU, real_t * d_MU, real_t * d_SIG);
@@ -124,7 +124,7 @@ private:
 	void calc_derivatives_for_all_sequences();
 
 	// отмасштабировать SVM задачу (svm problem) до -1 +1
-	static void scale_svm_problem(svm_problem & prob, svm_scaling_parameters & scalingParams, int num_features);
+	static void scale_svm_problem(svm_problem & prob, svm_scaling_parameters & scalingParams, int num_features, bool useScalingParams);
 
 	// преобразование вектора проивзодных в SVM задачу (svm problem)
 	static void fill_svm_problem_with_derivatives(int class_index, int n_of_models,

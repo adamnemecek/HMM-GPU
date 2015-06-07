@@ -201,6 +201,32 @@ int main(void)
 	svm_scaling_parameters scalingParameters;
 	//QueryPerformanceCounter(&t1);				// start timer
 	svm_model * trainedModel = HMM::trainWithDerivatives(trainingObservations, K, models, 2, scalingParameters);
+
+	///
+	/// классификация с помощью производных
+	///
+	real_t * Otest1 = new real_t[K * M1.T * M1.Z];
+	real_t * Otest2 = new real_t[K * M2.T * M2.Z];
+	M1.getObservations("model1\\Otest1.txt", Otest1);		// read learn observations for model 1
+	M2.getObservations("model1\\Otest2.txt", Otest2);		// read learn observations for model 2
+	int * predictions1 = new int[K];
+	int * predictions2 = new int[K];
+	HMM::classifyWithDerivatives(Otest1, K, models, 2, trainedModel, scalingParameters, predictions1);
+	HMM::classifyWithDerivatives(Otest2, K, models, 2, trainedModel, scalingParameters, predictions2);
+
+	float percent = 0;
+	for (int k = 0; k < K; k++)
+	{
+		if (predictions1[k] == -1)
+			percent += 1;
+		if (predictions2[k] == 1)
+			percent += 1;
+		std::cout << predictions1[k] << " " << predictions2[k] << std::endl;
+	}
+	percent /= K*2.0;
+
+	std::cout << "Derivatives percent = " << percent << std::endl;
+
 	//QueryPerformanceCounter(&t2);				// stop timer
 	//elapsedTime = (1.0*t2.QuadPart - 1.0*t1.QuadPart) / (frequency.QuadPart*1.0);
 	//printf("Derivatives learning complete\nElapsed time = %f s.\n", elapsedTime);
