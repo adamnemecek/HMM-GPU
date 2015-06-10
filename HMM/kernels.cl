@@ -179,6 +179,11 @@ __kernel void k_2_3_2(int N, int K, int T, int t,
 	for(j=0; j<N; j++)
 		atsum += alf(t,j,k)*A(j,i);
 	alf_t(t+1,i,k) = B(i,t+1,k)*atsum;
+	/*real_t temp = B(i,t+1,k)*atsum;
+	if (isfinite(temp))
+		alf_t(t+1,i,k) = temp;
+	else
+		alf_t(t+1,i,k) = 0;*/
 }
 
 __kernel void k_2_3_3(int N, int K,
@@ -399,6 +404,11 @@ __kernel void k_3_6(
 			if(isfinite(ttt))
 				MU(z,i,m) += gamd(t,i,m,k)*Otr(k,t,z);
 		}
+	/*ttt = MU(z,i,m) / gamd_sum[i*M+m];
+	if (isfinite(ttt))
+		MU(z,i,m) = ttt;
+	else
+		MU(z,i,m) = 0.0f;*/
 	MU(z,i,m) /= gamd_sum[i*M+m];
 }
 
@@ -423,6 +433,12 @@ __kernel void k_3_7(
 			if(isfinite(ttt))
 				SIG(z1,z2,i,m) += gamd(t,i,m,k)*tmp3;
 		}
+	
+	ttt = SIG(z1,z2,i,m) / gamd_sum[i*M+m];
+	/*if (isfinite(ttt))
+		SIG(z1,z2,i,m) = ttt;
+	else
+		SIG(z1,z2,i,m) = 0.0f;*/
 	SIG(z1,z2,i,m) /= gamd_sum[i*M+m];
 }
 

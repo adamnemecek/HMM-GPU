@@ -89,6 +89,49 @@ HMM::~HMM(void)
 	delete Otr; 
 }
 
+void HMM::saveModelToFile(std::string filename)
+{
+	using namespace std;
+	ofstream file(filename);
+	file << N << " " << M << " " << Z << " " << T << endl;
+	// save PI
+	for (int i = 0; i < N; i++)
+		file << PI[i] << " ";
+	file << endl;
+	// save A 
+	for (int i = 0; i < N; i++)
+	{
+		for (int j = 0; j < N; j++)
+			file << A(i, j) << " ";
+		file << endl;
+	}
+	// save TAU
+	for (int i = 0; i < N; i++)
+	{
+		for (int m = 0; m < M; m++)
+			file << TAU(i,m) << " ";
+		file << endl;
+	}
+	// save MU
+	for (int i = 0; i < N; i++)
+	{
+		for (int m = 0; m < M; m++)
+			for (int z = 0; z < Z; z++)
+				file << MU(z, i, m) << " ";
+		file << endl;
+	}
+	// save SIG
+	for (int i = 0; i < N; i++)
+	{
+		for (int m = 0; m < M; m++)
+			for (int z = 0; z < Z; z++)
+				file << SIG(z,z,i,m) << " ";
+		file << endl;
+	}
+	file << endl;
+	file.close();
+}
+
 void HMM::bindOpenCL(cl::Context * context_, std::map<std::string,cl::Kernel*> & kernels_, cl::CommandQueue * queue_) // привязка OpenCL переменных и создание буферов
 {
 	context = context_; kernels = kernels_; queue = queue_;
@@ -287,7 +330,7 @@ real_t HMM::calcBaumWelсh(cl_int n)
 	//std::fstream f; // debug
 
 	// TODO: выход по невязке (по вероятности)
-	for(cl_int iter=0; iter<MAX_ITER/*, abs(p-p_pred) > e*/; iter++)
+	for(cl_int iter=0; iter<MAX_ITER && abs(p-p_pred) > e; iter++)
 	{
 		// большой блок вспомогательных вычислений
 		internal_calculations(n);
@@ -344,7 +387,7 @@ real_t HMM::calcBaumWelсh(cl_int n)
 					{
 						real_t ttt = gamd_sum[i*M + m] + gamd(t, i, m, k);
 						if (isfinite(ttt))
-							gamd_sum[i*M + m] += gamd(t, i, m, k);
+							gamd_sum[i*M + m] = ttt; //gamd(t, i, m, k);
 					}
 				}
 		err = queue->enqueueWriteBuffer(*gam_sum_b, CL_TRUE, 0, N*sizeof(real_t), gam_sum);
@@ -573,6 +616,7 @@ real_t HMM::calcBaumWelсh(cl_int n)
 		// посчитаем новый логарифм вероятности
 		p = calcProbability();
 		std::swap(p, p_pred);
+		std::cout << "Baum, iter = " << iter << " p-p_pred = " << abs(p - p_pred) << std::endl;
 	}
 
 	delete gam_sum;
@@ -918,20 +962,20 @@ void HMM::scale_svm_problem(svm_problem & prob, svm_scaling_parameters & scaling
 		scalingParams.feature_min = new double[num_features];
 		scalingParams.feature_max = new double[num_features];
 	
-		for (int i = 0; i < num_features; i++)
+		for (int j = 0; j < num_features; j++)
 		{
-			scalingParams.feature_min[i] = DBL_MAX ;
-			scalingParams.feature_max[i] = -1000;
+			scalingParams.feature_min[j] = prob.x[0][j].value;
+			scalingParams.feature_max[j] = prob.x[0][j].value;
 		}
 		// first pass - reveal max and min features
 		for (int i = 0; i < prob.l; i++)
 		{
 			for (int j = 0; j < num_features; j++)
 			{
-				if (scalingParams.feature_min[i] > prob.x[i][j].value)
-					scalingParams.feature_min[i] = prob.x[i][j].value;
-				if (scalingParams.feature_max[i] < prob.x[i][j].value)
-					scalingParams.feature_max[i] = prob.x[i][j].value;
+				if (scalingParams.feature_min[j] > prob.x[i][j].value)
+					scalingParams.feature_min[j] = prob.x[i][j].value;
+				if (scalingParams.feature_max[j] < prob.x[i][j].value)
+					scalingParams.feature_max[j] = prob.x[i][j].value;
 			}
 		}
 	}
@@ -940,11 +984,11 @@ void HMM::scale_svm_problem(svm_problem & prob, svm_scaling_parameters & scaling
 	{
 		for (int j = 0; j < num_features; j++)
 		{
-			double maxDiff = scalingParams.feature_max[i] - scalingParams.feature_min[i];
+			double maxDiff = scalingParams.feature_max[j] - scalingParams.feature_min[j];
 			if (maxDiff != 0.0)
 				prob.x[i][j].value = scalingParams.lower +
-					2.0*(prob.x[i][j].value - scalingParams.feature_min[i]) /
-					(scalingParams.feature_max[i] - scalingParams.feature_min[i]);
+					2.0*(prob.x[i][j].value - scalingParams.feature_min[j]) /
+					(scalingParams.feature_max[j] - scalingParams.feature_min[j]);
 			else
 				prob.x[i][j].value = 0.0;
 		}
@@ -1100,8 +1144,8 @@ svm_model * HMM::trainWithDerivatives(real_t ** observations, int K, HMM ** mode
 	param.kernel_type = POLY;
 	param.degree = 3;
 	double num_features = (2.0*(N + N*N + N*M + 2 * N*M*Z));
-	param.gamma = 0.0001;
-	//param.gamma = 1.0 / num_features;	// 1/num_features
+	//param.gamma = 0.0001;
+	param.gamma = 1.0 / num_features;	// 1/num_features
 	param.coef0 = 10;
 	param.nu = 0.5;
 	param.cache_size = 100;

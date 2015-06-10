@@ -142,6 +142,9 @@ int main(void)
 	printf("Suck sess\n"); printf("Elapsed time = %f s.\n",elapsedTime);
 	// бшвхякемхъ оюпюлерпнб лндекх рсрю
 	//
+
+	M1.saveModelToFile("trained_model_1.txt");
+	M2.saveModelToFile("trained_model_2.txt");
 	
 
 	//
@@ -221,7 +224,8 @@ int main(void)
 			percent += 1;
 		if (predictions2[k] == 1)
 			percent += 1;
-		std::cout << predictions1[k] << " " << predictions2[k] << std::endl;
+		//if (k<10)
+		//	std::cout << predictions1[k] << " " << predictions2[k] << std::endl;
 	}
 	percent /= K*2.0;
 

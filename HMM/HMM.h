@@ -8,7 +8,7 @@
 #include <vector>
 #include "svm.h"
 
-#define MAX_ITER 5	// максимальное число итераций в алгоритме Баума-Велша
+#define MAX_ITER 50	// максимальное число итераций в алгоритме Баума-Велша
 //#define CONFIG_USE_DOUBLE             // использовать ли двойную точность
 
 #if defined(CONFIG_USE_DOUBLE)
@@ -84,6 +84,8 @@ public:
 	// загрузка параметров модели из файла
 	HMM(std::string filename);					
 	~HMM(void);
+	// сохранение параметров модели в файл
+	void saveModelToFile(std::string filename);
 	// нахождение параметров модели
 	void findModelParameters();					
 	// считывание тестовых последовательностей для классификации
